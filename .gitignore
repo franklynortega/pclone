@@ -1,0 +1,24 @@
+# Environment variables
+.env
+
+# Logs
+sync.log
+*.log
+
+# Lock files
+sync.lock
+
+# Node modules
+node_modules/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.swp
