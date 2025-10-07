@@ -54,31 +54,32 @@ node index.js MiTabla
 
 ## Configuración de Tablas
 
-Edita `tables.json` con la lista de tablas a sincronizar, sus columnas de clave primaria, intervalo de sincronización en minutos y prioridad de ejecución:
+Edita `tables.json` con la lista de tablas a sincronizar, sus columnas de clave primaria (array para PK compuestas), intervalo de sincronización en minutos y prioridad de ejecución:
 
 ```json
 [
   {
     "table": "Usuarios",
-    "pk": "UsuarioID",
+    "pk": ["UsuarioID"],
     "syncIntervalMinutes": 5,
     "priority": 1
   },
   {
     "table": "Productos",
-    "pk": "ProductoID",
+    "pk": ["ProductoID"],
     "syncIntervalMinutes": 30,
     "priority": 1
   },
   {
     "table": "Pedidos",
-    "pk": "PedidoID",
+    "pk": ["PedidoID", "ProductoID"],
     "syncIntervalMinutes": 60,
     "priority": 2
   }
 ]
 ```
 
+- `pk`: Array de columnas que forman la clave primaria (soporta PK compuestas).
 - `syncIntervalMinutes`: Minutos entre verificaciones en el cron job.
 - `priority`: Número para orden de ejecución (menor = primero, para tablas base antes de dependientes).
 
@@ -134,7 +135,7 @@ El script usa lock files (`sync.lock`) para evitar ejecuciones concurrentes. Con
 
 - Las claves primarias se definen en `tables.json`. Para una tabla específica, usa `PK_COLUMN` env var.
 - Para tablas relacionadas, ordena `tables.json` por dependencias (padres primero).
-- Maneja tipos de datos básicos; para tipos complejos, ajustar escaping en el código.
+- Maneja tipos de datos básicos, incluyendo VARBINARY/IMAGE (convierte a hex); para tipos muy complejos, verificar.
 - No elimina filas en clone que no estén en target (solo upsert).
 - Reintentos automáticos: Hasta 3 reintentos con backoff exponencial para errores de conexión o queries.
 

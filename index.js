@@ -14,9 +14,9 @@ async function main() {
     const tablesData = JSON.parse(fs.readFileSync('tables.json', 'utf8'));
     tables = tablesData;
   } else if (filteredArgs.length === 1) {
-    // Una tabla específica, asumir pk=id si no especificado
+    // Una tabla específica, asumir pk=['id'] si no especificado
     const tableName = filteredArgs[0];
-    const pk = process.env.PK_COLUMN || 'id';
+    const pk = process.env.PK_COLUMNS ? JSON.parse(process.env.PK_COLUMNS) : ['id'];
     tables = [{ table: tableName, pk }];
   } else {
     console.log('Uso: node index.js [nombreTabla] [--sync]');
@@ -25,7 +25,7 @@ async function main() {
   }
 
   for (const { table, pk } of tables) {
-    console.log(`Procesando tabla: ${table} con PK: ${pk}`);
+    console.log(`Procesando tabla: ${table} con PK: ${pk.join(', ')}`);
     await compareTable(table, pk, sync);
   }
 }

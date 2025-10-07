@@ -18,13 +18,26 @@ async function getChecksum(pool, tableName) {
 
 async function getColumns(pool, tableName) {
   return await retry(async () => {
-    const query = `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '${tableName}' ORDER BY ORDINAL_POSITION`;
+    const query = `SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '${tableName}' ORDER BY ORDINAL_POSITION`;
     const result = await pool.request().query(query);
-    return result.recordset.map(row => row.COLUMN_NAME);
+    return result.recordset.map(row => ({ name: row.COLUMN_NAME, type: row.DATA_TYPE }));
   }, { retries: 3, minTimeout: 1000, maxTimeout: 5000 });
 }
 
-async function syncTable(tableName, pkColumn) {
+function formatValue(val, type) {
+  if (val === null) return 'NULL';
+  if (type && (type.toLowerCase().includes('binary') || type.toLowerCase().includes('image'))) {
+    // Para VARBINARY, IMAGE, etc., convertir buffer a hex
+    if (Buffer.isBuffer(val)) {
+      return `0x${val.toString('hex')}`;
+    }
+    return 'NULL'; // Si no es buffer, asumir null
+  }
+  if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`;
+  return val;
+}
+
+async function syncTable(tableName, pkColumns) {
   let targetPool, clonePool;
   try {
     targetPool = await sql.connect(targetConfig);
@@ -33,8 +46,10 @@ async function syncTable(tableName, pkColumn) {
     const columns = await getColumns(targetPool, tableName);
     if (columns.length === 0) throw new Error('Tabla no encontrada en target');
 
-    const pk = pkColumn;
-    if (!columns.includes(pk)) throw new Error(`Columna ${pk} no encontrada`);
+    const columnNames = columns.map(col => col.name);
+    for (const pk of pkColumns) {
+      if (!columnNames.includes(pk)) throw new Error(`Columna ${pk} no encontrada`);
+    }
 
     // Leer datos de target
     const selectQuery = `SELECT * FROM ${tableName}`;
@@ -52,21 +67,22 @@ async function syncTable(tableName, pkColumn) {
       const batch = rows.slice(i, i + batchSize);
 
       // Construir VALUES para MERGE
-      const values = batch.map(row => `(${columns.map(col => {
-        const val = row[col];
-        if (val === null) return 'NULL';
-        if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`; // escape quotes
-        return val;
+      const values = batch.map(row => `(${columnNames.map(colName => {
+        const col = columns.find(c => c.name === colName);
+        const val = row[colName];
+        return formatValue(val, col.type);
       }).join(', ')})`).join(', ');
 
-      const setClause = columns.filter(col => col !== pk).map(col => `${col} = source.${col}`).join(', ');
+      const setClause = columns.filter(col => !pkColumns.includes(col)).map(col => `${col} = source.${col}`).join(', ');
       const insertCols = columns.join(', ');
       const insertVals = columns.map(col => `source.${col}`).join(', ');
 
+      const onClause = pkColumns.map(pk => `targetTable.${pk} = source.${pk}`).join(' AND ');
+
       const mergeQuery = `
         MERGE ${tableName} AS targetTable
-        USING (VALUES ${values}) AS source (${columns.join(', ')})
-        ON targetTable.${pk} = source.${pk}
+        USING (VALUES ${values}) AS source (${columnNames.join(', ')})
+        ON ${onClause}
         WHEN MATCHED THEN
           UPDATE SET ${setClause}
         WHEN NOT MATCHED THEN
@@ -87,7 +103,7 @@ async function syncTable(tableName, pkColumn) {
   }
 }
 
-async function compareTable(tableName, pkColumn, sync = false) {
+async function compareTable(tableName, pkColumns, sync = false) {
   let targetPool, clonePool;
   try {
     targetPool = await sql.connect(targetConfig);
@@ -102,7 +118,7 @@ async function compareTable(tableName, pkColumn, sync = false) {
     } else {
       logger.warn(`Tabla ${tableName} no está sincronizada.`);
       if (sync) {
-        await syncTable(tableName, pkColumn);
+        await syncTable(tableName, pkColumns);
       }
       return false;
     }

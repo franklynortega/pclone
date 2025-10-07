@@ -35,7 +35,7 @@ async function runSync() {
       const last = lastSync[table] || 0;
       const intervalMs = syncIntervalMinutes * 60 * 1000;
       if (now - last >= intervalMs) {
-        logger.info(`Procesando tabla: ${table}`, { pk, syncIntervalMinutes });
+        logger.info(`Procesando tabla: ${table}`, { pk: pk.join(', '), syncIntervalMinutes });
         try {
           await compareTable(table, pk, true); // sync=true
           lastSync[table] = now;
