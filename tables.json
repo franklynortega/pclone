@@ -1,0 +1,20 @@
+[
+  {
+    "table": "Usuarios",
+    "pk": "UsuarioID",
+    "syncIntervalMinutes": 5,
+    "priority": 1
+  },
+  {
+    "table": "Productos",
+    "pk": "ProductoID",
+    "syncIntervalMinutes": 30,
+    "priority": 1
+  },
+  {
+    "table": "Pedidos",
+    "pk": "PedidoID",
+    "syncIntervalMinutes": 60,
+    "priority": 2
+  }
+]
