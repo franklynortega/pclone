@@ -10,9 +10,23 @@ Este script permite comparar una tabla entre un servidor "target" (solo lectura)
 
 ## Instalación
 
-1. Clona o descarga el proyecto.
-2. Ejecuta `npm install` para instalar dependencias.
-3. Copia `.env.example` a `.env` y configura tus credenciales.
+1. Clona el repositorio:
+   ```bash
+   git clone https://github.com/franklynortega/pclone
+   cd pclone
+   ```
+
+2. Instala dependencias:
+   ```bash
+   npm install
+   ```
+
+3. Configura variables de entorno:
+   ```bash
+   cp .env.example .env
+   # Edita .env con tus credenciales
+   ```
+
 4. Los logs se guardan en `sync.log` y se muestran en consola.
 
 ## Configuración
