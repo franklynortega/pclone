@@ -1,26 +1,74 @@
 [
   {
+    "table": "saMoneda",
+    "pk": ["co_mone"],
+    "syncIntervalMinutes": 10,
+    "priority": 2
+  },
+  {
+    "table": "saTipoCliente",
+    "pk": ["tip_cli"],
+    "syncIntervalMinutes": 10,
+    "priority": 2
+  },
+  {
     "table": "saCliente",
     "pk": ["co_cli"],
     "syncIntervalMinutes": 10,
-    "priority": 1
+    "priority": 3
   },
   {
     "table": "saProveedor",
     "pk": ["co_prov"],
     "syncIntervalMinutes": 10,
+    "priority": 3
+  },
+  {
+    "table": "saSubLinea",
+    "pk": ["co_lin", "co_subl"],
+    "syncIntervalMinutes": 10,
     "priority": 1
   },
-   {
+  {
+    "table": "saLineaArticulo",
+    "pk": ["co_lin"],
+    "syncIntervalMinutes": 10,
+    "priority": 2
+  },
+  {
+    "table": "saCatArticulo",
+    "pk": ["co_cat"],
+    "syncIntervalMinutes": 10,
+    "priority": 2
+  },
+  {
+    "table": "saColor",
+    "pk": ["co_color"],
+    "syncIntervalMinutes": 10,
+    "priority": 2
+  },
+  {
+    "table": "saUbicacion",
+    "pk": ["co_ubicacion"],
+    "syncIntervalMinutes": 10,
+    "priority": 2
+  },
+  {
+    "table": "saProcedencia",
+    "pk": ["cod_proc"],
+    "syncIntervalMinutes": 10,
+    "priority": 2
+  },
+  {
     "table": "saArticulo",
     "pk": ["co_art"],
     "syncIntervalMinutes": 10,
-    "priority": 1
+    "priority": 3
   },
   {
     "table": "saArtPrecio",
     "pk": ["co_art", "co_precio"],
     "syncIntervalMinutes": 10,
-    "priority": 1
+    "priority": 4
   }
 ]
