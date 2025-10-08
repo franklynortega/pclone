@@ -1,20 +1,26 @@
 [
   {
-    "table": "Usuarios",
-    "pk": ["UsuarioID"],
-    "syncIntervalMinutes": 5,
+    "table": "saCliente",
+    "pk": ["co_cli"],
+    "syncIntervalMinutes": 10,
     "priority": 1
   },
   {
-    "table": "Productos",
-    "pk": ["ProductoID"],
-    "syncIntervalMinutes": 30,
+    "table": "saProveedor",
+    "pk": ["co_prov"],
+    "syncIntervalMinutes": 10,
+    "priority": 1
+  },
+   {
+    "table": "saArticulo",
+    "pk": ["co_art"],
+    "syncIntervalMinutes": 10,
     "priority": 1
   },
   {
-    "table": "Pedidos",
-    "pk": ["PedidoID"],
-    "syncIntervalMinutes": 60,
-    "priority": 2
+    "table": "saArtPrecio",
+    "pk": ["co_art", "co_precio"],
+    "syncIntervalMinutes": 10,
+    "priority": 1
   }
 ]

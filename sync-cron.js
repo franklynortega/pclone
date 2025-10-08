@@ -38,10 +38,11 @@ async function runSync() {
         logger.info(`Procesando tabla: ${table}`, { pk: pk.join(', '), syncIntervalMinutes });
         try {
           await compareTable(table, pk, true); // sync=true
-          lastSync[table] = now;
         } catch (error) {
           logger.error(`Error en tabla ${table}:`, error);
         }
+        // Actualizar lastSync siempre que se procesó
+        lastSync[table] = now;
       } else {
         logger.debug(`Saltando tabla ${table}, próxima sync en ${Math.ceil((intervalMs - (now - last)) / 60000)} min`);
       }

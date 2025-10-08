@@ -27,7 +27,13 @@ Este script permite comparar una tabla entre un servidor "target" (solo lectura)
    # Edita .env con tus credenciales
    ```
 
-4. Los logs se guardan en `sync.log` y se muestran en consola.
+4. (Opcional) Genera distribuible standalone:
+   ```bash
+   npm run dist
+   ```
+   Los ejecutables se generan en `dist/` (no requieren Node.js).
+
+5. Los logs se guardan en `sync.log` y se muestran en consola.
 
 ## Configuración
 

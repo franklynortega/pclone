@@ -14,10 +14,17 @@ async function main() {
     const tablesData = JSON.parse(fs.readFileSync('tables.json', 'utf8'));
     tables = tablesData;
   } else if (filteredArgs.length === 1) {
-    // Una tabla específica, asumir pk=['id'] si no especificado
+    // Una tabla específica, buscar pk en tables.json
     const tableName = filteredArgs[0];
-    const pk = process.env.PK_COLUMNS ? JSON.parse(process.env.PK_COLUMNS) : ['id'];
-    tables = [{ table: tableName, pk }];
+    const tablesData = JSON.parse(fs.readFileSync('tables.json', 'utf8'));
+    const tableConfig = tablesData.find(t => t.table === tableName);
+    if (tableConfig) {
+      tables = [{ table: tableName, pk: tableConfig.pk }];
+    } else {
+      // Si no está en tables.json, usar pk por defecto
+      const pk = process.env.PK_COLUMNS ? JSON.parse(process.env.PK_COLUMNS) : ['id'];
+      tables = [{ table: tableName, pk }];
+    }
   } else {
     console.log('Uso: node index.js [nombreTabla] [--sync]');
     console.log('Si no se especifica tabla, procesa todas desde tables.json');
