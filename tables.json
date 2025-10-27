@@ -6,6 +6,48 @@
     "priority": 2
   },
   {
+    "table": "saCondicionPago",
+    "pk": ["co_cond"],
+    "syncIntervalMinutes": 10,
+    "priority": 2
+  },
+    {
+    "table": "saZona",
+    "pk": ["co_zon"],
+    "syncIntervalMinutes": 10,
+    "priority": 2
+  },
+    {
+    "table": "saSegmento",
+    "pk": ["co_seg"],
+    "syncIntervalMinutes": 10,
+    "priority": 2
+  },
+    {
+    "table": "saVendedor",
+    "pk": ["co_ven"],
+    "syncIntervalMinutes": 10,
+    "priority": 2
+  },
+  {
+    "table": "saCuentaIngEgr",
+    "pk": ["co_cta_ingr_egr"],
+    "syncIntervalMinutes": 10,
+    "priority": 2
+  },
+  {
+    "table": "saTabuladorIslr",
+    "pk": ["co_tab"],
+    "syncIntervalMinutes": 10,
+    "priority": 2
+  },
+  {
+    "table": "saPais",
+    "pk": ["co_pais"],
+    "syncIntervalMinutes": 10,
+    "priority": 2
+  },
+  {
     "table": "saTipoCliente",
     "pk": ["tip_cli"],
     "syncIntervalMinutes": 10,
@@ -18,10 +60,28 @@
     "priority": 3
   },
   {
+    "table": "saTipoProveedor",
+    "pk": ["tip_pro"],
+    "syncIntervalMinutes": 10,
+    "priority": 2
+  },
+  {
     "table": "saProveedor",
     "pk": ["co_prov"],
     "syncIntervalMinutes": 10,
     "priority": 3
+  },
+  {
+    "table": "saSucursal",
+    "pk": ["co_sucur"],
+    "syncIntervalMinutes": 10,
+    "priority": 1
+  },
+  {
+    "table": "saAlmacen",
+    "pk": ["co_alma"],
+    "syncIntervalMinutes": 10,
+    "priority": 2
   },
   {
     "table": "saSubLinea",
