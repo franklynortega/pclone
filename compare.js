@@ -338,10 +338,10 @@ async function compareTable(tableName, pkColumns, sync = false) {
     logger.debug(`Checksums - Target: ${targetChecksum}, Clone: ${cloneChecksum}`);
 
     if (targetChecksum === cloneChecksum) {
-      logger.info(`Tabla ${tableName} está sincronizada (checksums iguales).`);
+      logger.info(`Tabla ${tableName} no presentó cambios (checksums iguales).`);
       return true;
     } else {
-      logger.warn(`Tabla ${tableName} no está sincronizada (checksums diferentes).`);
+      logger.warn(`Tabla ${tableName} presentó cambios (checksums diferentes).`);
       if (sync) {
         await syncTable(tableName, originalPkColumns);
         // Recalcular checksums después de sincronización

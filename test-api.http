@@ -1,0 +1,141 @@
+### Configuración de variables
+@baseUrl = http://localhost:3000
+@apiKey = default-api-key
+
+# Configuración de ejemplo (reemplaza con tus valores reales)
+@targetServer = localhost
+@targetDb = target_database
+@targetUser = target_username
+@targetPass = target_password
+@cloneServer = localhost
+@cloneDb = clone_database
+@cloneUser = clone_username
+@clonePass = clone_password
+
+### 1. Iniciar sincronización de tablas (POST /api/sync)
+POST {{baseUrl}}/api/sync
+Content-Type: application/json
+x-api-key: {{apiKey}}
+
+{
+  "targetServer": "pgc.sytes.net",
+  "targetDb": "A_777",
+  "targetUser": "profit",
+  "targetPass": "FomvesPm+Ecdtm",
+  "cloneServer": "SRV-DEMO\\SQLEXPRESS",
+  "cloneDb": "A_777",
+  "cloneUser": "profit",
+  "clonePass": "profit",
+  "tables": [
+    {
+      "table": "saMoneda",
+      "pk": ["co_mone"]
+    },
+    {
+      "table": "saCliente",
+      "pk": ["co_cli"]
+    }
+  ],
+  "sync": true
+}
+
+###
+
+### 2. Verificar estado de tarea (GET /api/sync/:id)
+# Reemplaza {taskId} con el ID real de la tarea obtenida del POST anterior
+GET {{baseUrl}}/api/sync/d8ce2231-b891-41d1-a0bd-8545aedc1f34
+x-api-key: {{apiKey}}
+
+###
+
+### 3. Ejemplo con más tablas (sincronización completa)
+POST {{baseUrl}}/api/sync
+Content-Type: application/json
+x-api-key: {{apiKey}}
+
+{
+  "targetServer": "pgc.sytes.net",
+  "targetDb": "A_777",
+  "targetUser": "profit",
+  "targetPass": "FomvesPm+Ecdtm",
+  "cloneServer": "SRV-DEMO\\SQLEXPRESS",
+  "cloneDb": "A_777",
+  "cloneUser": "profit",
+  "clonePass": "profit",
+  "tables": [
+    {
+      "table": "saSucursal",
+      "pk": ["co_sucur"]
+    },
+    {
+      "table": "saAlmacen",
+      "pk": ["co_alma"]
+    },
+    {
+      "table": "saLineaArticulo",
+      "pk": ["co_lin"]
+    },
+    {
+      "table": "saArticulo",
+      "pk": ["co_art"]
+    }
+  ],
+  "sync": false
+}
+
+###
+
+### 4. Prueba de error - API key inválida
+POST {{baseUrl}}/api/sync
+Content-Type: application/json
+x-api-key: invalid-key
+
+{
+  "targetServer": "pgc.sytes.net",
+  "targetDb": "test",
+  "targetUser": "test",
+  "targetPass": "test",
+  "cloneServer": "test",
+  "cloneDb": "test",
+  "cloneUser": "test",
+  "clonePass": "test",
+  "tables": [
+    {
+      "table": "test",
+      "pk": ["id"]
+    }
+  ],
+  "sync": true
+}
+
+###
+
+### 5. Prueba de error - Payload inválido (falta targetServer)
+POST {{baseUrl}}/api/sync
+Content-Type: application/json
+x-api-key: {{apiKey}}
+
+{
+  "targetDb": "target_database",
+  "targetUser": "target_username",
+  "targetPass": "target_password",
+  "cloneServer": "clone_server",
+  "cloneDb": "clone_database",
+  "cloneUser": "clone_username",
+  "clonePass": "clone_password",
+  "tables": [
+    {
+      "table": "saMoneda",
+      "pk": ["co_mone"]
+    }
+  ],
+  "sync": true
+}
+
+###
+
+### 6. Prueba de error - Tarea no encontrada
+GET {{baseUrl}}/api/sync/invalid-task-id
+x-api-key: {{apiKey}}
+
+###
