@@ -17,7 +17,10 @@ const loadDefaultTablesBtn = document.getElementById('load-default-tables-btn');
 const tablesContainer = document.getElementById('tables-container');
 const executeAllPresetsBtn = document.getElementById('execute-all-presets-btn');
 const confirmExecuteAllBtn = document.getElementById('confirm-execute-all-btn');
+const schedulePresetBtn = document.getElementById('schedule-preset-btn');
+const confirmScheduleBtn = document.getElementById('confirm-schedule-btn');
 const presetsList = document.getElementById('presets-list');
+const schedulesList = document.getElementById('schedules-list');
 const configTab = document.getElementById('config-tab');
 const presetsTab = document.getElementById('presets-tab');
 
@@ -32,6 +35,8 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDefaultTablesBtn.addEventListener('click', loadDefaultTables);
     executeAllPresetsBtn.addEventListener('click', executeAllPresets);
     confirmExecuteAllBtn.addEventListener('click', executeAllPresets);
+    schedulePresetBtn.addEventListener('click', showScheduleModal);
+    confirmScheduleBtn.addEventListener('click', schedulePreset);
 
     // Cargar presets al inicio
     loadPresets();
@@ -73,7 +78,9 @@ async function handleLogin(e) {
 // Funciones de presets
 async function loadPresets() {
     try {
-        const response = await fetch('/presets');
+        const response = await fetch('/presets', {
+            headers: { 'x-username': currentUser }
+        });
 
         if (!response.ok) {
             console.error('Error fetching presets:', response.status);
@@ -94,6 +101,9 @@ async function loadPresets() {
         // Renderizar lista de presets
         renderPresetsList(data.presets || []);
 
+        // Cargar schedules
+        loadSchedules();
+
         // Si hay presets, mostrar tab Presets por defecto
         if ((data.presets || []).length > 0) {
             const tab = new bootstrap.Tab(presetsTab);
@@ -109,7 +119,9 @@ async function loadSelectedPreset() {
     if (!presetName) return;
 
     try {
-        const response = await fetch(`/presets/${presetName}`);
+        const response = await fetch(`/presets/${presetName}`, {
+            headers: { 'x-username': currentUser }
+        });
 
         const data = await response.json();
         loadConfig(data.config);
@@ -132,7 +144,8 @@ async function savePreset() {
         const response = await fetch('/presets', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'x-username': currentUser
             },
             body: JSON.stringify({ name: presetName, config })
         });
@@ -481,7 +494,9 @@ function renderPresetsList(presets) {
 
 async function executePreset(presetName) {
     try {
-        const response = await fetch(`/presets/${presetName}`);
+        const response = await fetch(`/presets/${presetName}`, {
+            headers: { 'x-username': currentUser }
+        });
 
         const data = await response.json();
         if (data.config) {
@@ -540,7 +555,9 @@ async function executeAllPresets() {
     logsDiv.innerHTML = '';
 
     try {
-        const response = await fetch('/presets');
+        const response = await fetch('/presets', {
+            headers: { 'x-username': currentUser }
+        });
 
         const data = await response.json();
         const presets = data.presets;
@@ -587,8 +604,10 @@ async function executeAllPresets() {
 async function executePresetSequentiallyInline(presetName) {
     return new Promise(async (resolve) => {
         try {
-            const response = await fetch(`/presets/${presetName}`);
-
+            const response = await fetch(`/presets/${presetName}`, {
+                headers: { 'x-username': currentUser }
+            });
+    
             const data = await response.json();
             if (data.config) {
                 const config = data.config;
@@ -649,7 +668,9 @@ async function executePresetSequentiallyInline(presetName) {
 async function executeAndPollInline(presetName, onStatusUpdate) {
     return new Promise(async (resolve) => {
         try {
-            const response = await fetch(`/presets/${presetName}`);
+            const response = await fetch(`/presets/${presetName}`, {
+                headers: { 'x-username': currentUser }
+            });
 
             const data = await response.json();
             if (data.config) {
@@ -728,7 +749,8 @@ async function deletePreset(presetName) {
 
     try {
         const response = await fetch(`/presets/${presetName}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: { 'x-username': currentUser }
         });
 
         if (response.ok) {
@@ -749,4 +771,164 @@ function showError(elementId, message) {
         element.style.display = 'none';
         element.textContent = '';
     }, 5000);
+}
+
+function showScheduleModal() {
+    const select = document.getElementById('schedule-preset-select');
+    select.innerHTML = '<option value="">Seleccionar preset...</option>';
+
+    // Populate with current presets
+    const options = document.querySelectorAll('#preset-select option');
+    options.forEach(option => {
+        if (option.value) {
+            const newOption = document.createElement('option');
+            newOption.value = option.value;
+            newOption.textContent = option.textContent;
+            select.appendChild(newOption);
+        }
+    });
+
+    // Reset form
+    document.getElementById('frequency').value = '';
+    updateFrequencyFields();
+
+    // Add event listener
+    document.getElementById('frequency').addEventListener('change', updateFrequencyFields);
+
+    const modal = new bootstrap.Modal(document.getElementById('scheduleModal'));
+    modal.show();
+}
+
+function updateFrequencyFields() {
+    const freq = document.getElementById('frequency').value;
+    document.getElementById('minutes-group').style.display = freq === 'minutes' ? 'block' : 'none';
+    document.getElementById('hours-group').style.display = freq === 'hours' ? 'block' : 'none';
+    document.getElementById('daily-group').style.display = freq === 'daily' ? 'block' : 'none';
+    document.getElementById('weekly-group').style.display = freq === 'weekly' ? 'block' : 'none';
+    document.getElementById('monthly-group').style.display = freq === 'monthly' ? 'block' : 'none';
+}
+
+function generateCron() {
+    const freq = document.getElementById('frequency').value;
+    if (freq === 'minutes') {
+        const min = document.getElementById('minutes-input').value;
+        if (!min || min < 1 || min > 59) return null;
+        return `*/${min} * * * *`;
+    } else if (freq === 'hours') {
+        const hour = document.getElementById('hours-input').value;
+        if (!hour || hour < 1 || hour > 23) return null;
+        return `0 */${hour} * * *`;
+    } else if (freq === 'daily') {
+        const time = document.getElementById('daily-time').value;
+        if (!time) return null;
+        const [h, m] = time.split(':');
+        return `${m} ${h} * * *`;
+    } else if (freq === 'weekly') {
+        const day = document.getElementById('weekly-day').value;
+        const time = document.getElementById('weekly-time').value;
+        if (!time) return null;
+        const [h, m] = time.split(':');
+        return `${m} ${h} * * ${day}`;
+    } else if (freq === 'monthly') {
+        const day = document.getElementById('monthly-day').value;
+        const time = document.getElementById('monthly-time').value;
+        if (!day || !time || day < 1 || day > 31) return null;
+        const [h, m] = time.split(':');
+        return `${m} ${h} ${day} * *`;
+    }
+    return null;
+}
+
+async function schedulePreset() {
+    const preset = document.getElementById('schedule-preset-select').value;
+    const cronExpression = generateCron();
+
+    if (!preset || !cronExpression) {
+        alert('Seleccione un preset y configure la frecuencia válida');
+        return;
+    }
+
+    try {
+        const response = await fetch('/schedule', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': 'default-api-key',
+                'x-username': currentUser
+            },
+            body: JSON.stringify({ preset, cronExpression })
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            alert('Preset programado exitosamente');
+            loadSchedules();
+            bootstrap.Modal.getInstance(document.getElementById('scheduleModal')).hide();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    } catch (error) {
+        alert('Error de conexión');
+    }
+}
+
+async function loadSchedules() {
+    try {
+        const response = await fetch('/schedules', {
+            headers: { 'x-username': currentUser, 'x-api-key': 'default-api-key' }
+        });
+
+        const data = await response.json();
+        renderSchedulesList(data.schedules || []);
+    } catch (error) {
+        console.error('Error cargando schedules:', error);
+    }
+}
+
+function renderSchedulesList(schedules) {
+    schedulesList.innerHTML = '';
+
+    if (schedules.length === 0) {
+        schedulesList.innerHTML = '<li class="list-group-item text-muted">No hay trabajos programados.</li>';
+        return;
+    }
+
+    schedules.forEach(schedule => {
+        const item = document.createElement('li');
+        item.className = 'list-group-item d-flex justify-content-between align-items-center';
+        item.innerHTML = `
+            <span>${schedule.preset}</span>
+            <button class="btn btn-danger btn-sm stop-schedule-btn" data-id="${schedule.id}">
+                <i class="bi bi-stop-fill"></i> Detener
+            </button>
+        `;
+        schedulesList.appendChild(item);
+    });
+
+    // Add event listeners
+    document.querySelectorAll('.stop-schedule-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const id = e.target.closest('button').dataset.id;
+            stopSchedule(id);
+        });
+    });
+}
+
+async function stopSchedule(id) {
+    if (!confirm('¿Detener este trabajo programado?')) return;
+
+    try {
+        const response = await fetch(`/schedule/${id}`, {
+            method: 'DELETE',
+            headers: { 'x-username': currentUser, 'x-api-key': 'default-api-key' }
+        });
+
+        if (response.ok) {
+            loadSchedules();
+        } else {
+            alert('Error deteniendo trabajo');
+        }
+    } catch (error) {
+        alert('Error de conexión');
+    }
 }

@@ -5,6 +5,7 @@ import { compareTable } from './compare.js';
 import logger from './logger.js';
 import fs from 'fs';
 import crypto from 'crypto';
+import cron from 'node-cron';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,6 +19,9 @@ app.use(express.static('public'));
 
 // Almacén de tareas en memoria (en producción usar Redis o DB)
 const tasks = new Map();
+
+// Almacén de cron jobs por usuario
+const userCronJobs = new Map(); // username -> Map(jobId -> { cron, preset, id })
 
 // Middleware de autenticación
 const authenticate = (req, res, next) => {
@@ -166,55 +170,55 @@ app.post('/auth/login', (req, res) => {
 
 // Endpoint GET /presets
 app.get('/presets', (req, res) => {
-  const username = 'admin'; // Temporalmente hardcodeado para testing
-  const presets = loadPresets();
-  const userPresets = presets[username] || {};
-  res.json({ presets: Object.keys(userPresets) });
+   const username = req.headers['x-username'] || 'admin';
+   const presets = loadPresets();
+   const userPresets = presets[username] || {};
+   res.json({ presets: Object.keys(userPresets) });
 });
 
 // Endpoint POST /presets
 app.post('/presets', (req, res) => {
-  const username = 'admin'; // Temporalmente hardcodeado
-  const { name, config } = req.body;
-  if (!name || !config) {
-    return res.status(400).json({ error: 'Nombre y configuración requeridos' });
-  }
+   const username = req.headers['x-username'] || 'admin';
+   const { name, config } = req.body;
+   if (!name || !config) {
+      return res.status(400).json({ error: 'Nombre y configuración requeridos' });
+   }
 
-  const presets = loadPresets();
-  if (!presets[username]) presets[username] = {};
-  presets[username][name] = config;
-  savePresets(presets);
+   const presets = loadPresets();
+   if (!presets[username]) presets[username] = {};
+   presets[username][name] = config;
+   savePresets(presets);
 
-  res.json({ success: true });
+   res.json({ success: true });
 });
 
 // Endpoint GET /presets/:name
 app.get('/presets/:name', (req, res) => {
-  const username = 'admin'; // Temporalmente hardcodeado
-  const name = req.params.name;
-  const presets = loadPresets();
-  const userPresets = presets[username] || {};
-  const config = userPresets[name];
+   const username = req.headers['x-username'] || 'admin';
+   const name = req.params.name;
+   const presets = loadPresets();
+   const userPresets = presets[username] || {};
+   const config = userPresets[name];
 
-  if (!config) {
-    return res.status(404).json({ error: 'Preset no encontrado' });
-  }
+   if (!config) {
+      return res.status(404).json({ error: 'Preset no encontrado' });
+   }
 
-  res.json({ config });
+   res.json({ config });
 });
 
 // Endpoint DELETE /presets/:name
 app.delete('/presets/:name', (req, res) => {
-  const username = 'admin'; // Temporalmente hardcodeado
-  const name = req.params.name;
-  const presets = loadPresets();
-  if (presets[username] && presets[username][name]) {
-    delete presets[username][name];
-    savePresets(presets);
-    res.json({ success: true });
-  } else {
-    res.status(404).json({ error: 'Preset no encontrado' });
-  }
+   const username = req.headers['x-username'] || 'admin';
+   const name = req.params.name;
+   const presets = loadPresets();
+   if (presets[username] && presets[username][name]) {
+      delete presets[username][name];
+      savePresets(presets);
+      res.json({ success: true });
+   } else {
+      res.status(404).json({ error: 'Preset no encontrado' });
+   }
 });
 
 // Endpoint GET /tables - devuelve las tablas por defecto
@@ -225,6 +229,83 @@ app.get('/tables', (req, res) => {
   } catch (error) {
     logger.error('Error cargando tables.json:', error);
     res.status(500).json({ error: 'Error cargando tablas por defecto' });
+  }
+});
+
+// Endpoint POST /schedule
+app.post('/schedule', authenticate, (req, res) => {
+  const username = req.headers['x-username'] || 'admin';
+  const { preset, cronExpression } = req.body;
+  const trimmedCron = cronExpression.trim();
+  if (!preset || !trimmedCron || typeof trimmedCron !== 'string') {
+    return res.status(400).json({ error: 'Preset y expresión cron válidos requeridos' });
+  }
+
+  if (!userCronJobs.has(username)) {
+    userCronJobs.set(username, new Map());
+  }
+
+  const userJobs = userCronJobs.get(username);
+  const jobId = uuidv4();
+
+  let job;
+  try {
+    job = cron.schedule(trimmedCron, async () => {
+      try {
+        // Load preset config
+        const presets = loadPresets();
+        const userPresets = presets[username] || {};
+        const config = userPresets[preset];
+        if (!config) {
+          logger.error(`Preset ${preset} no encontrado para usuario ${username}`);
+          return;
+        }
+
+        // Create task
+        const taskId = uuidv4();
+        tasks.set(taskId, {
+          id: taskId,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          payload: config,
+          results: [],
+          logs: []
+        });
+
+        // Process
+        await processSyncTask(taskId);
+      } catch (error) {
+        logger.error(`Error en cron job para ${username}:${preset}:`, error);
+      }
+    });
+  } catch (error) {
+    return res.status(400).json({ error: 'Expresión cron inválida' });
+  }
+
+  userJobs.set(jobId, { cron: job, preset, id: jobId });
+  res.json({ jobId, message: 'Trabajo programado' });
+});
+
+// Endpoint GET /schedules
+app.get('/schedules', authenticate, (req, res) => {
+  const username = req.headers['x-username'] || 'admin';
+  const userJobs = userCronJobs.get(username) || new Map();
+  const schedules = Array.from(userJobs.values()).map(({ preset, id }) => ({ id, preset }));
+  res.json({ schedules });
+});
+
+// Endpoint DELETE /schedule/:id
+app.delete('/schedule/:id', authenticate, (req, res) => {
+  const username = req.headers['x-username'] || 'admin';
+  const jobId = req.params.id;
+  const userJobs = userCronJobs.get(username);
+  if (userJobs && userJobs.has(jobId)) {
+    const job = userJobs.get(jobId);
+    job.cron.stop();
+    userJobs.delete(jobId);
+    res.json({ message: 'Trabajo detenido' });
+  } else {
+    res.status(404).json({ error: 'Trabajo no encontrado' });
   }
 });
 
