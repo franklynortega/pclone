@@ -166,11 +166,7 @@ app.post('/auth/login', (req, res) => {
 
 // Endpoint GET /presets
 app.get('/presets', (req, res) => {
-  const username = req.headers['x-user'];
-  if (!username) {
-    return res.status(401).json({ error: 'Usuario no autenticado' });
-  }
-
+  const username = 'admin'; // Temporalmente hardcodeado para testing
   const presets = loadPresets();
   const userPresets = presets[username] || {};
   res.json({ presets: Object.keys(userPresets) });
@@ -178,11 +174,7 @@ app.get('/presets', (req, res) => {
 
 // Endpoint POST /presets
 app.post('/presets', (req, res) => {
-  const username = req.headers['x-user'];
-  if (!username) {
-    return res.status(401).json({ error: 'Usuario no autenticado' });
-  }
-
+  const username = 'admin'; // Temporalmente hardcodeado
   const { name, config } = req.body;
   if (!name || !config) {
     return res.status(400).json({ error: 'Nombre y configuración requeridos' });
@@ -198,11 +190,7 @@ app.post('/presets', (req, res) => {
 
 // Endpoint GET /presets/:name
 app.get('/presets/:name', (req, res) => {
-  const username = req.headers['x-user'];
-  if (!username) {
-    return res.status(401).json({ error: 'Usuario no autenticado' });
-  }
-
+  const username = 'admin'; // Temporalmente hardcodeado
   const name = req.params.name;
   const presets = loadPresets();
   const userPresets = presets[username] || {};
@@ -213,6 +201,20 @@ app.get('/presets/:name', (req, res) => {
   }
 
   res.json({ config });
+});
+
+// Endpoint DELETE /presets/:name
+app.delete('/presets/:name', (req, res) => {
+  const username = 'admin'; // Temporalmente hardcodeado
+  const name = req.params.name;
+  const presets = loadPresets();
+  if (presets[username] && presets[username][name]) {
+    delete presets[username][name];
+    savePresets(presets);
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ error: 'Preset no encontrado' });
+  }
 });
 
 // Endpoint GET /tables - devuelve las tablas por defecto
@@ -259,18 +261,47 @@ async function processSyncTask(taskId) {
     for (const tableConfig of task.payload.tables) {
       try {
         logger.info(`Procesando tabla ${tableConfig.table} en tarea ${taskId}`);
-        task.logs.push(`Procesando tabla: ${tableConfig.table}`);
+        task.logs.push(`Iniciando procesamiento de tabla: ${tableConfig.table}`);
 
-        const synced = await compareTable(tableConfig.table, tableConfig.pk, task.payload.sync);
+        const result = await compareTable(tableConfig.table, tableConfig.pk, task.payload.sync);
 
-        task.results.push({
-          table: tableConfig.table,
-          status: 'success',
-          message: task.payload.sync ? 'Sincronización completada' : 'Comparación completada',
-          changed: !synced
-        });
+        if (typeof result === 'object' && result.error) {
+          task.results.push({
+            table: tableConfig.table,
+            status: 'error',
+            message: result.error,
+            changed: null
+          });
+          task.logs.push(`Error en tabla ${tableConfig.table}: ${result.error}`);
+        } else {
+          const synced = typeof result === 'object' ? result.synced : result;
+          if (synced === false) {
+            // Asumir error si retorna false (compatibilidad con compare.js actual)
+            task.results.push({
+              table: tableConfig.table,
+              status: 'error',
+              message: 'Error en comparación: Falló la conexión o comparación',
+              changed: null
+            });
+            task.logs.push(`Error en tabla ${tableConfig.table}: Error en comparación`);
+          } else {
+            let message;
+            if (synced) {
+              message = task.payload.sync ? 'No se encontraron cambios en la tabla' : 'Comparación completada, no hay cambios';
+            } else {
+              message = task.payload.sync ? 'Tabla actualizada con éxito' : 'Comparación completada, se encontraron cambios';
+            }
 
-        task.logs.push(`Tabla ${tableConfig.table} procesada exitosamente`);
+            task.results.push({
+              table: tableConfig.table,
+              status: 'success',
+              message: message,
+              changed: !synced
+            });
+
+            task.logs.push(`Procesamiento de tabla ${tableConfig.table}: ${message}`);
+          }
+        }
 
       } catch (error) {
         logger.error(`Error en tabla ${tableConfig.table} de tarea ${taskId}:`, error);

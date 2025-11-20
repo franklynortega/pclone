@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PClone - Interfaz de Sincronización</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -11,125 +13,209 @@
         <h1>PClone - Sincronización de Bases de Datos</h1>
 
         <!-- Sección de Login -->
-        <div id="login-section">
-            <h2>Iniciar Sesión</h2>
-            <form id="login-form">
-                <div class="form-group">
-                    <label for="username">Usuario:</label>
-                    <input type="text" id="username" required>
-                </div>
-                <div class="form-group">
-                    <label for="password">Contraseña:</label>
-                    <input type="password" id="password" required>
-                </div>
-                <button type="submit">Iniciar Sesión</button>
-            </form>
-            <div id="login-error" class="error"></div>
+        <div id="login-section" class="card" style="display: block;">
+            <div class="card-header">
+                <h2 class="mb-0">Iniciar Sesión</h2>
+            </div>
+            <div class="card-body">
+                <form id="login-form">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Usuario:</label>
+                        <input type="text" id="username" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Contraseña:</label>
+                        <input type="password" id="password" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Iniciar Sesión</button>
+                </form>
+                <div id="login-error" class="alert alert-danger mt-3" style="display: none;"></div>
+            </div>
         </div>
 
         <!-- Sección de Configuración -->
         <div id="config-section" style="display: none;">
-            <h2>Configuración de Sincronización</h2>
+            <div class="card">
+                <div class="card-header">
+                    <ul class="nav nav-tabs card-header-tabs" id="config-tabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="config-tab" data-bs-toggle="tab" data-bs-target="#config-panel" type="button" role="tab">Configuración</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="presets-tab" data-bs-toggle="tab" data-bs-target="#presets-panel" type="button" role="tab">Presets</button>
+                        </li>
+                    </ul>
+                </div>
+                <div class="card-body">
+                    <div class="tab-content" id="config-tab-content">
+                        <div class="tab-pane fade show active" id="config-panel" role="tabpanel">
 
-            <!-- Selector de Presets -->
-            <div class="form-group">
-                <label for="preset-select">Cargar Preset:</label>
-                <select id="preset-select">
-                    <option value="">Seleccionar preset...</option>
-                </select>
-                <button id="load-preset-btn">Cargar</button>
-            </div>
+                    <!-- Selector de Presets -->
+                    <div class="mb-3">
+                        <label for="preset-select" class="form-label">Cargar Preset:</label>
+                        <div class="input-group">
+                            <select id="preset-select" class="form-select">
+                                <option value="">Seleccionar preset...</option>
+                            </select>
+                            <button id="load-preset-btn" class="btn btn-outline-primary">Cargar</button>
+                        </div>
+                    </div>
 
-            <!-- Conexión Target -->
-            <h3>Base de Datos Objetivo (Target)</h3>
-            <div class="db-config">
-                <div class="form-group">
-                    <label for="target-server">Servidor:</label>
-                    <input type="text" id="target-server" required>
-                </div>
-                <div class="form-group">
-                    <label for="target-db">Base de Datos:</label>
-                    <input type="text" id="target-db" required>
-                </div>
-                <div class="form-group">
-                    <label for="target-user">Usuario:</label>
-                    <input type="text" id="target-user" required>
-                </div>
-                <div class="form-group">
-                    <label for="target-pass">Contraseña:</label>
-                    <input type="password" id="target-pass" required>
-                </div>
-            </div>
+                    <!-- Conexión Target -->
+                    <h4>Base de Datos Objetivo (Target)</h4>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="target-server" class="form-label">Servidor:</label>
+                            <input type="text" id="target-server" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="target-db" class="form-label">Base de Datos:</label>
+                            <input type="text" id="target-db" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="target-user" class="form-label">Usuario:</label>
+                            <input type="text" id="target-user" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="target-pass" class="form-label">Contraseña:</label>
+                            <input type="password" id="target-pass" class="form-control" required>
+                        </div>
+                    </div>
 
-            <!-- Conexión Clone -->
-            <h3>Base de Datos Clon (Clone)</h3>
-            <div class="db-config">
-                <div class="form-group">
-                    <label for="clone-server">Servidor:</label>
-                    <input type="text" id="clone-server" required>
-                </div>
-                <div class="form-group">
-                    <label for="clone-db">Base de Datos:</label>
-                    <input type="text" id="clone-db" required>
-                </div>
-                <div class="form-group">
-                    <label for="clone-user">Usuario:</label>
-                    <input type="text" id="clone-user" required>
-                </div>
-                <div class="form-group">
-                    <label for="clone-pass">Contraseña:</label>
-                    <input type="password" id="clone-pass" required>
-                </div>
-            </div>
+                    <!-- Conexión Clone -->
+                    <h4>Base de Datos Clon (Clone)</h4>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="clone-server" class="form-label">Servidor:</label>
+                            <input type="text" id="clone-server" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="clone-db" class="form-label">Base de Datos:</label>
+                            <input type="text" id="clone-db" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="clone-user" class="form-label">Usuario:</label>
+                            <input type="text" id="clone-user" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="clone-pass" class="form-label">Contraseña:</label>
+                            <input type="password" id="clone-pass" class="form-control" required>
+                        </div>
+                    </div>
 
-            <!-- Tablas -->
-            <h3>Tablas a Procesar</h3>
-            <div class="form-group">
-                <button id="load-default-tables-btn">Cargar Tablas por Defecto</button>
-            </div>
-            <div id="tables-container">
-                <div class="table-entry">
-                    <input type="text" class="table-name" placeholder="Nombre de tabla" required>
-                    <input type="text" class="table-pk" placeholder="Claves primarias (separadas por coma)" required>
-                    <button class="remove-table-btn">Remover</button>
+                    <!-- Tablas -->
+                    <h4>Tablas a Procesar</h4>
+                    <div class="mb-3">
+                        <button id="load-default-tables-btn" class="btn btn-outline-secondary">Cargar Tablas por Defecto</button>
+                    </div>
+                    <div id="tables-container">
+                        <div class="table-entry">
+                            <input type="text" class="form-control table-name" placeholder="Nombre de tabla" required>
+                            <input type="text" class="form-control table-pk" placeholder="Claves primarias (separadas por coma)" required>
+                            <button class="btn btn-danger remove-table-btn">Remover</button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <button id="add-table-btn" class="btn btn-success">Agregar Tabla</button>
+                    </div>
+
+                    <!-- API Key -->
+                    <div class="mb-3">
+                        <label for="api-key" class="form-label">API Key:</label>
+                        <input type="password" id="api-key" class="form-control" value="default-api-key" required>
+                    </div>
+
+                    <!-- Opciones -->
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="sync-checkbox">
+                            <label class="form-check-label" for="sync-checkbox">
+                                Sincronizar (si no, solo comparar)
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Guardar Preset -->
+                    <div class="mb-3">
+                        <label for="preset-name" class="form-label">Guardar como Preset:</label>
+                        <div class="input-group">
+                            <input type="text" id="preset-name" class="form-control" placeholder="Nombre del preset">
+                            <button id="save-preset-btn" class="btn btn-outline-primary">Guardar</button>
+                        </div>
+                    </div>
+
+                    <!-- Ejecutar -->
+                    <div class="d-grid">
+                        <button id="execute-btn" class="btn btn-primary btn-lg">Ejecutar Sincronización</button>
+                    </div>
+                    <div id="config-error" class="alert alert-danger mt-3" style="display: none;"></div>
+                        </div>
+
+                        <div class="tab-pane fade" id="presets-panel" role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h4>Mis Presets</h4>
+                                <button id="execute-all-presets-btn" class="btn btn-success">Ejecutar Todos</button>
+                            </div>
+                            <ul id="presets-list" class="list-group">
+                            </ul>
+                            <div id="execution-status" class="mt-3" style="display: none;">
+                                <h5>Estado de Ejecución</h5>
+                                <div id="execution-task-status">Estado: Pendiente</div>
+                                <div id="execution-logs" class="mt-3"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <button id="add-table-btn">Agregar Tabla</button>
-
-            <!-- API Key -->
-            <div class="form-group">
-                <label for="api-key">API Key:</label>
-                <input type="password" id="api-key" value="default-api-key" required>
-            </div>
-
-            <!-- Opciones -->
-            <div class="form-group">
-                <label for="sync-checkbox">
-                    <input type="checkbox" id="sync-checkbox"> Sincronizar (si no, solo comparar)
-                </label>
-            </div>
-
-            <!-- Guardar Preset -->
-            <div class="form-group">
-                <label for="preset-name">Guardar como Preset:</label>
-                <input type="text" id="preset-name" placeholder="Nombre del preset">
-                <button id="save-preset-btn">Guardar</button>
-            </div>
-
-            <!-- Ejecutar -->
-            <button id="execute-btn">Ejecutar Sincronización</button>
-            <div id="config-error" class="error"></div>
         </div>
 
         <!-- Sección de Estado -->
         <div id="status-section" style="display: none;">
-            <h2>Estado de la Tarea</h2>
-            <div id="task-status">Estado: Pendiente</div>
-            <div id="task-logs"></div>
-            <button id="back-btn">Volver a Configuración</button>
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="mb-0">Estado de la Tarea</h2>
+                </div>
+                <div class="card-body">
+                    <div id="task-status">Estado: Pendiente</div>
+                    <div id="task-logs" class="mt-3"></div>
+                    <div class="d-grid mt-3">
+                        <button id="back-btn" class="btn btn-secondary">Volver a Configuración</button>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
         </div>
     </div>
 
+    <!-- Modal para ejecutar todos los presets -->
+    <div class="modal fade" id="executeAllModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Ejecutar Todos los Presets</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>¿Está seguro de que desea ejecutar todos los presets? Se procesarán en secuencia.</p>
+                    <div id="execute-all-progress" style="display: none;">
+                        <h6>Progreso:</h6>
+                        <div class="progress mb-3">
+                            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <div id="execute-all-logs"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success" id="confirm-execute-all-btn">Ejecutar Todos</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

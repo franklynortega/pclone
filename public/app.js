@@ -15,6 +15,11 @@ const backBtn = document.getElementById('back-btn');
 const addTableBtn = document.getElementById('add-table-btn');
 const loadDefaultTablesBtn = document.getElementById('load-default-tables-btn');
 const tablesContainer = document.getElementById('tables-container');
+const executeAllPresetsBtn = document.getElementById('execute-all-presets-btn');
+const confirmExecuteAllBtn = document.getElementById('confirm-execute-all-btn');
+const presetsList = document.getElementById('presets-list');
+const configTab = document.getElementById('config-tab');
+const presetsTab = document.getElementById('presets-tab');
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', () => {
@@ -25,6 +30,11 @@ document.addEventListener('DOMContentLoaded', () => {
     backBtn.addEventListener('click', showConfig);
     addTableBtn.addEventListener('click', addTableEntry);
     loadDefaultTablesBtn.addEventListener('click', loadDefaultTables);
+    executeAllPresetsBtn.addEventListener('click', executeAllPresets);
+    confirmExecuteAllBtn.addEventListener('click', executeAllPresets);
+
+    // Cargar presets al inicio
+    loadPresets();
 
     // Event delegation para remover tablas
     tablesContainer.addEventListener('click', (e) => {
@@ -63,18 +73,32 @@ async function handleLogin(e) {
 // Funciones de presets
 async function loadPresets() {
     try {
-        const response = await fetch('/presets', {
-            headers: { 'x-user': currentUser }
-        });
+        const response = await fetch('/presets');
+
+        if (!response.ok) {
+            console.error('Error fetching presets:', response.status);
+            return;
+        }
 
         const data = await response.json();
         presetSelect.innerHTML = '<option value="">Seleccionar preset...</option>';
-        data.presets.forEach(preset => {
-            const option = document.createElement('option');
-            option.value = preset;
-            option.textContent = preset;
-            presetSelect.appendChild(option);
-        });
+        if (data.presets) {
+            data.presets.forEach(preset => {
+                const option = document.createElement('option');
+                option.value = preset;
+                option.textContent = preset;
+                presetSelect.appendChild(option);
+            });
+        }
+
+        // Renderizar lista de presets
+        renderPresetsList(data.presets || []);
+
+        // Si hay presets, mostrar tab Presets por defecto
+        if ((data.presets || []).length > 0) {
+            const tab = new bootstrap.Tab(presetsTab);
+            tab.show();
+        }
     } catch (error) {
         console.error('Error cargando presets:', error);
     }
@@ -85,9 +109,7 @@ async function loadSelectedPreset() {
     if (!presetName) return;
 
     try {
-        const response = await fetch(`/presets/${presetName}`, {
-            headers: { 'x-user': currentUser }
-        });
+        const response = await fetch(`/presets/${presetName}`);
 
         const data = await response.json();
         loadConfig(data.config);
@@ -110,8 +132,7 @@ async function savePreset() {
         const response = await fetch('/presets', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'x-user': currentUser
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({ name: presetName, config })
         });
@@ -210,11 +231,13 @@ function loadConfig(config) {
 
 function addTableEntry() {
     const entry = document.createElement('div');
-    entry.className = 'table-entry';
+    entry.className = 'table-entry mb-2';
     entry.innerHTML = `
-        <input type="text" class="table-name" placeholder="Nombre de tabla" required>
-        <input type="text" class="table-pk" placeholder="Claves primarias (separadas por coma)" required>
-        <button class="remove-table-btn">Remover</button>
+        <label class="form-label table-label">Nombre de tabla:</label>
+        <input type="text" class="form-control table-name" required>
+        <label class="form-label table-label">Claves primarias:</label>
+        <input type="text" class="form-control table-pk" placeholder="Separadas por coma" required>
+        <button class="btn btn-danger remove-table-btn">Remover</button>
     `;
     tablesContainer.appendChild(entry);
 }
@@ -332,11 +355,82 @@ function updateStatus(data) {
     }
 }
 
+function startInlinePolling() {
+    if (pollingInterval) clearInterval(pollingInterval);
+    pollingInterval = setInterval(pollInlineStatus, 2000);
+}
+
+async function pollInlineStatus() {
+    if (!taskId || !currentApiKey) return;
+
+    try {
+        const response = await fetch(`/api/sync/${taskId}`, {
+            headers: { 'x-api-key': currentApiKey }
+        });
+
+        const data = await response.json();
+        updateInlineStatus(data);
+
+        if (data.status === 'completed' || data.status === 'failed') {
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+            currentApiKey = null;
+        }
+    } catch (error) {
+        console.error('Error obteniendo estado:', error);
+    }
+}
+
+function updateInlineStatus(data) {
+    const statusDiv = document.getElementById('execution-task-status');
+    statusDiv.textContent = `Estado: ${data.status}`;
+    statusDiv.className = `status-${data.status}`;
+
+    const logsDiv = document.getElementById('execution-logs');
+    logsDiv.innerHTML = '';
+
+    if (data.logs) {
+        data.logs.forEach(log => {
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry log-info';
+            logEntry.textContent = log;
+            logsDiv.appendChild(logEntry);
+        });
+    }
+
+    if (data.results) {
+        data.results.forEach(result => {
+            const resultEntry = document.createElement('div');
+            resultEntry.className = `log-entry ${result.status === 'success' ? 'log-success' : 'log-error'}`;
+            resultEntry.textContent = `${result.table}: ${result.message}`;
+            logsDiv.appendChild(resultEntry);
+        });
+    }
+
+    // Auto-scroll to bottom
+    logsDiv.scrollTop = logsDiv.scrollHeight;
+}
+
+function showInlineError(message) {
+    const logsDiv = document.getElementById('execution-logs');
+    logsDiv.innerHTML = `<div class="log-entry log-error">${message}</div>`;
+    document.getElementById('execution-status').style.display = 'block';
+    document.getElementById('execution-task-status').textContent = 'Estado: Error';
+    currentApiKey = null;
+}
+
 // Funciones de UI
 function showConfig() {
     loginSection.style.display = 'none';
     configSection.style.display = 'block';
     statusSection.style.display = 'none';
+
+    // Cambiar al tab de presets
+    const presetsTab = document.getElementById('presets-tab');
+    if (presetsTab) {
+        const tab = new bootstrap.Tab(presetsTab);
+        tab.show();
+    }
 }
 
 function showStatus() {
@@ -345,8 +439,314 @@ function showStatus() {
     statusSection.style.display = 'block';
 }
 
+function renderPresetsList(presets) {
+    presetsList.innerHTML = '';
+    if (presets.length === 0) {
+        presetsList.innerHTML = '<li class="list-group-item text-muted">No hay presets guardados.</li>';
+        return;
+    }
+
+    presets.forEach(preset => {
+        const item = document.createElement('li');
+        item.className = 'list-group-item d-flex justify-content-between align-items-center';
+        item.innerHTML = `
+            <span>${preset}</span>
+            <div>
+                <button class="btn btn-primary btn-sm execute-preset-btn me-2" data-preset="${preset}">
+                    <i class="bi bi-play-fill"></i> Ejecutar
+                </button>
+                <button class="btn btn-danger btn-sm delete-preset-btn" data-preset="${preset}">
+                    <i class="bi bi-trash-fill"></i> Eliminar
+                </button>
+            </div>
+        `;
+        presetsList.appendChild(item);
+    });
+
+    // Agregar event listeners a los botones
+    document.querySelectorAll('.execute-preset-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const presetName = e.target.closest('button').dataset.preset;
+            executePreset(presetName);
+        });
+    });
+
+    document.querySelectorAll('.delete-preset-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const presetName = e.target.closest('button').dataset.preset;
+            deletePreset(presetName);
+        });
+    });
+}
+
+async function executePreset(presetName) {
+    try {
+        const response = await fetch(`/presets/${presetName}`);
+
+        const data = await response.json();
+        if (data.config) {
+            // Mostrar estado inline
+            document.getElementById('execution-status').style.display = 'block';
+            document.getElementById('execution-task-status').textContent = 'Estado: Iniciando...';
+            document.getElementById('execution-logs').innerHTML = '';
+
+            // Ejecutar directamente
+            const config = data.config;
+            currentApiKey = config.apiKey;
+            const execResponse = await fetch('/api/sync', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': config.apiKey
+                },
+                body: JSON.stringify({
+                    targetServer: config.targetServer,
+                    targetDb: config.targetDb,
+                    targetUser: config.targetUser,
+                    targetPass: config.targetPass,
+                    cloneServer: config.cloneServer,
+                    cloneDb: config.cloneDb,
+                    cloneUser: config.cloneUser,
+                    clonePass: config.clonePass,
+                    tables: config.tables,
+                    sync: config.sync
+                })
+            });
+
+            const execData = await execResponse.json();
+            if (execResponse.ok) {
+                taskId = execData.taskId;
+                startInlinePolling();
+            } else {
+                showInlineError(execData.error || 'Error iniciando tarea');
+            }
+        } else {
+            showInlineError('Error cargando preset');
+        }
+    } catch (error) {
+        showInlineError('Error ejecutando preset');
+    }
+}
+
+function showExecuteAllModal() {
+    const modal = new bootstrap.Modal(document.getElementById('executeAllModal'));
+    modal.show();
+}
+
+async function executeAllPresets() {
+    document.getElementById('execution-status').style.display = 'block';
+    document.getElementById('execution-task-status').textContent = 'Estado: Ejecutando todos los presets...';
+    const logsDiv = document.getElementById('execution-logs');
+    logsDiv.innerHTML = '';
+
+    try {
+        const response = await fetch('/presets');
+
+        const data = await response.json();
+        const presets = data.presets;
+
+        if (presets.length === 0) {
+            logsDiv.innerHTML = '<div class="log-entry log-info">No hay presets para ejecutar.</div>';
+            document.getElementById('execution-task-status').textContent = 'Estado: Completado';
+            return;
+        }
+
+        for (const preset of presets) {
+            document.getElementById('execution-task-status').textContent = `Estado: Ejecutando ${preset}...`;
+            logsDiv.innerHTML += `<div class="log-entry log-info">Iniciando preset: ${preset}</div>`;
+            let lastLogLength = 0;
+            let lastResultLength = 0;
+            await executeAndPollInline(preset, (pollData) => {
+                // Append only new logs and results
+                if (pollData.logs && pollData.logs.length > lastLogLength) {
+                    pollData.logs.slice(lastLogLength).forEach(log => {
+                        logsDiv.innerHTML += `<div class="log-entry log-info">${log}</div>`;
+                    });
+                    lastLogLength = pollData.logs.length;
+                }
+                if (pollData.results && pollData.results.length > lastResultLength) {
+                    pollData.results.slice(lastResultLength).forEach(result => {
+                        logsDiv.innerHTML += `<div class="log-entry ${result.status === 'success' ? 'log-success' : 'log-error'}">${result.table}: ${result.message}</div>`;
+                    });
+                    lastResultLength = pollData.results.length;
+                }
+                // Auto-scroll to bottom
+                logsDiv.scrollTop = logsDiv.scrollHeight;
+            });
+            logsDiv.innerHTML += `<div class="log-entry log-success">Preset ${preset} completado.</div>`;
+        }
+
+        logsDiv.innerHTML += '<div class="log-entry log-success">Todos los presets ejecutados.</div>';
+        document.getElementById('execution-task-status').textContent = 'Estado: Completado';
+    } catch (error) {
+        logsDiv.innerHTML += '<div class="log-entry log-error">Error ejecutando presets.</div>';
+        document.getElementById('execution-task-status').textContent = 'Estado: Error';
+    }
+}
+
+async function executePresetSequentiallyInline(presetName) {
+    return new Promise(async (resolve) => {
+        try {
+            const response = await fetch(`/presets/${presetName}`);
+
+            const data = await response.json();
+            if (data.config) {
+                const config = data.config;
+                const execResponse = await fetch('/api/sync', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': config.apiKey
+                    },
+                    body: JSON.stringify({
+                        targetServer: config.targetServer,
+                        targetDb: config.targetDb,
+                        targetUser: config.targetUser,
+                        targetPass: config.targetPass,
+                        cloneServer: config.cloneServer,
+                        cloneDb: config.cloneDb,
+                        cloneUser: config.cloneUser,
+                        clonePass: config.clonePass,
+                        tables: config.tables,
+                        sync: config.sync
+                    })
+                });
+
+                const execData = await execResponse.json();
+                if (execResponse.ok) {
+                    const taskIdLocal = execData.taskId;
+                    // Polling hasta que termine
+                    const poll = async () => {
+                        try {
+                            const pollResponse = await fetch(`/api/sync/${taskIdLocal}`, {
+                                headers: { 'x-api-key': config.apiKey }
+                            });
+                            const pollData = await pollResponse.json();
+                            if (pollData.status === 'completed' || pollData.status === 'failed') {
+                                resolve();
+                            } else {
+                                setTimeout(poll, 2000);
+                            }
+                        } catch (error) {
+                            console.error('Error polling:', error);
+                            resolve();
+                        }
+                    };
+                    poll();
+                } else {
+                    resolve();
+                }
+            } else {
+                resolve();
+            }
+        } catch (error) {
+            console.error('Error ejecutando preset:', error);
+            resolve();
+        }
+    });
+}
+
+async function executeAndPollInline(presetName, onStatusUpdate) {
+    return new Promise(async (resolve) => {
+        try {
+            const response = await fetch(`/presets/${presetName}`);
+
+            const data = await response.json();
+            if (data.config) {
+                const config = data.config;
+                const execResponse = await fetch('/api/sync', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': config.apiKey
+                    },
+                    body: JSON.stringify({
+                        targetServer: config.targetServer,
+                        targetDb: config.targetDb,
+                        targetUser: config.targetUser,
+                        targetPass: config.targetPass,
+                        cloneServer: config.cloneServer,
+                        cloneDb: config.cloneDb,
+                        cloneUser: config.cloneUser,
+                        clonePass: config.clonePass,
+                        tables: config.tables,
+                        sync: config.sync
+                    })
+                });
+
+                const execData = await execResponse.json();
+                if (execResponse.ok) {
+                    const taskIdLocal = execData.taskId;
+                    const poll = async () => {
+                        try {
+                            const pollResponse = await fetch(`/api/sync/${taskIdLocal}`, {
+                                headers: { 'x-api-key': config.apiKey }
+                            });
+                            const pollData = await pollResponse.json();
+                            onStatusUpdate(pollData);
+                            if (pollData.status === 'completed' || pollData.status === 'failed') {
+                                resolve();
+                            } else {
+                                setTimeout(poll, 2000);
+                            }
+                        } catch (error) {
+                            console.error('Error polling:', error);
+                            resolve();
+                        }
+                    };
+                    poll();
+                } else {
+                    onStatusUpdate({
+                        status: 'failed',
+                        logs: [],
+                        results: [{ table: 'N/A', status: 'error', message: execData.error || 'Error iniciando tarea' }]
+                    });
+                    resolve();
+                }
+            } else {
+                onStatusUpdate({
+                    status: 'failed',
+                    logs: [],
+                    results: [{ table: 'N/A', status: 'error', message: 'Error cargando preset' }]
+                });
+                resolve();
+            }
+        } catch (error) {
+            console.error('Error ejecutando preset:', error);
+            onStatusUpdate({
+                status: 'failed',
+                logs: [],
+                results: [{ table: 'N/A', status: 'error', message: 'Error de conexión' }]
+            });
+            resolve();
+        }
+    });
+}
+
+async function deletePreset(presetName) {
+    if (!confirm(`¿Eliminar el preset "${presetName}"?`)) return;
+
+    try {
+        const response = await fetch(`/presets/${presetName}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            loadPresets(); // Recargar lista
+        } else {
+            showError('config-error', 'Error eliminando preset');
+        }
+    } catch (error) {
+        showError('config-error', 'Error de conexión');
+    }
+}
+
 function showError(elementId, message) {
     const element = document.getElementById(elementId);
     element.textContent = message;
-    setTimeout(() => element.textContent = '', 5000);
+    element.style.display = 'block';
+    setTimeout(() => {
+        element.style.display = 'none';
+        element.textContent = '';
+    }, 5000);
 }

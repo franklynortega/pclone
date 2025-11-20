@@ -119,11 +119,23 @@
     "syncIntervalMinutes": 10,
     "priority": 2
   },
-  {
+   {
+    "table": "saUnidad",
+    "pk": ["co_uni"],
+    "syncIntervalMinutes": 10,
+    "priority": 2
+  },
+   {
     "table": "saArticulo",
     "pk": ["co_art"],
     "syncIntervalMinutes": 10,
     "priority": 3
+  },
+  {
+    "table": "saArtUnidad",
+    "pk": ["co_art","co_uni"],
+    "syncIntervalMinutes": 10,
+    "priority": 4
   },
   {
     "table": "saArtPrecio",
