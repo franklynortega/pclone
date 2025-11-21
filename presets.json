@@ -27,9 +27,138 @@
           "pk": [
             "co_zon"
           ]
+        },
+        {
+          "table": "saSegmento",
+          "pk": [
+            "co_seg"
+          ]
+        },
+        {
+          "table": "saVendedor",
+          "pk": [
+            "co_ven"
+          ]
+        },
+        {
+          "table": "saCuentaIngEgr",
+          "pk": [
+            "co_cta_ingr_egr"
+          ]
+        },
+        {
+          "table": "saTabuladorIslr",
+          "pk": [
+            "co_tab"
+          ]
+        },
+        {
+          "table": "saPais",
+          "pk": [
+            "co_pais"
+          ]
+        },
+        {
+          "table": "saTipoCliente",
+          "pk": [
+            "tip_cli"
+          ]
+        },
+        {
+          "table": "saCliente",
+          "pk": [
+            "co_cli"
+          ]
+        },
+        {
+          "table": "saTipoProveedor",
+          "pk": [
+            "tip_pro"
+          ]
+        },
+        {
+          "table": "saProveedor",
+          "pk": [
+            "co_prov"
+          ]
+        },
+        {
+          "table": "saSucursal",
+          "pk": [
+            "co_sucur"
+          ]
+        },
+        {
+          "table": "saAlmacen",
+          "pk": [
+            "co_alma"
+          ]
+        },
+        {
+          "table": "saSubLinea",
+          "pk": [
+            "co_lin",
+            "co_subl"
+          ]
+        },
+        {
+          "table": "saLineaArticulo",
+          "pk": [
+            "co_lin"
+          ]
+        },
+        {
+          "table": "saCatArticulo",
+          "pk": [
+            "co_cat"
+          ]
+        },
+        {
+          "table": "saColor",
+          "pk": [
+            "co_color"
+          ]
+        },
+        {
+          "table": "saUbicacion",
+          "pk": [
+            "co_ubicacion"
+          ]
+        },
+        {
+          "table": "saProcedencia",
+          "pk": [
+            "cod_proc"
+          ]
+        },
+        {
+          "table": "saUnidad",
+          "pk": [
+            "co_uni"
+          ]
+        },
+        {
+          "table": "saArticulo",
+          "pk": [
+            "co_art"
+          ]
+        },
+        {
+          "table": "saArtUnidad",
+          "pk": [
+            "co_art",
+            "co_uni"
+          ]
+        },
+        {
+          "table": "saArtPrecio",
+          "pk": [
+            "co_art",
+            "co_precio"
+          ]
         }
       ],
-      "sync": false,
+      "sync": true,
       "apiKey": "default-api-key"
     },
     "REDICA": {
@@ -58,6 +187,211 @@
           "table": "saZona",
           "pk": [
             "co_zon"
+          ]
+        },
+        {
+          "table": "saSegmento",
+          "pk": [
+            "co_seg"
+          ]
+        },
+        {
+          "table": "saVendedor",
+          "pk": [
+            "co_ven"
+          ]
+        },
+        {
+          "table": "saCuentaIngEgr",
+          "pk": [
+            "co_cta_ingr_egr"
+          ]
+        },
+        {
+          "table": "saTabuladorIslr",
+          "pk": [
+            "co_tab"
+          ]
+        },
+        {
+          "table": "saPais",
+          "pk": [
+            "co_pais"
+          ]
+        },
+        {
+          "table": "saTipoCliente",
+          "pk": [
+            "tip_cli"
+          ]
+        },
+        {
+          "table": "saCliente",
+          "pk": [
+            "co_cli"
+          ]
+        }
+      ],
+      "sync": true,
+      "apiKey": "default-api-key"
+    }
+  },
+  "root": {
+    "PVO": {
+      "targetServer": "pgc.sytes.net",
+      "targetDb": "A_777",
+      "targetUser": "profit",
+      "targetPass": "FomvesPm+Ecdtm",
+      "cloneServer": "SRV-DEMO\\SQLEXPRESS",
+      "cloneDb": "A_777",
+      "cloneUser": "profit",
+      "clonePass": "profit",
+      "tables": [
+        {
+          "table": "saMoneda",
+          "pk": [
+            "co_mone"
+          ]
+        },
+        {
+          "table": "saCondicionPago",
+          "pk": [
+            "co_cond"
+          ]
+        },
+        {
+          "table": "saZona",
+          "pk": [
+            "co_zon"
+          ]
+        },
+        {
+          "table": "saSegmento",
+          "pk": [
+            "co_seg"
+          ]
+        },
+        {
+          "table": "saVendedor",
+          "pk": [
+            "co_ven"
+          ]
+        },
+        {
+          "table": "saCuentaIngEgr",
+          "pk": [
+            "co_cta_ingr_egr"
+          ]
+        },
+        {
+          "table": "saTabuladorIslr",
+          "pk": [
+            "co_tab"
+          ]
+        },
+        {
+          "table": "saPais",
+          "pk": [
+            "co_pais"
+          ]
+        },
+        {
+          "table": "saTipoCliente",
+          "pk": [
+            "tip_cli"
+          ]
+        },
+        {
+          "table": "saCliente",
+          "pk": [
+            "co_cli"
+          ]
+        },
+        {
+          "table": "saTipoProveedor",
+          "pk": [
+            "tip_pro"
+          ]
+        },
+        {
+          "table": "saProveedor",
+          "pk": [
+            "co_prov"
+          ]
+        },
+        {
+          "table": "saSucursal",
+          "pk": [
+            "co_sucur"
+          ]
+        },
+        {
+          "table": "saAlmacen",
+          "pk": [
+            "co_alma"
+          ]
+        },
+        {
+          "table": "saSubLinea",
+          "pk": [
+            "co_lin",
+            "co_subl"
+          ]
+        },
+        {
+          "table": "saLineaArticulo",
+          "pk": [
+            "co_lin"
+          ]
+        },
+        {
+          "table": "saCatArticulo",
+          "pk": [
+            "co_cat"
+          ]
+        },
+        {
+          "table": "saColor",
+          "pk": [
+            "co_color"
+          ]
+        },
+        {
+          "table": "saUbicacion",
+          "pk": [
+            "co_ubicacion"
+          ]
+        },
+        {
+          "table": "saProcedencia",
+          "pk": [
+            "cod_proc"
+          ]
+        },
+        {
+          "table": "saUnidad",
+          "pk": [
+            "co_uni"
+          ]
+        },
+        {
+          "table": "saArticulo",
+          "pk": [
+            "co_art"
+          ]
+        },
+        {
+          "table": "saArtUnidad",
+          "pk": [
+            "co_art",
+            "co_uni"
+          ]
+        },
+        {
+          "table": "saArtPrecio",
+          "pk": [
+            "co_art",
+            "co_precio"
           ]
         }
       ],

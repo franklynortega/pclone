@@ -1,12 +1,22 @@
-# Script de Comparación y Sincronización de Tablas SQL Server
+# PClone - Interfaz Web de Sincronización de Bases de Datos SQL Server
 
-Este script permite comparar una tabla entre un servidor "target" (solo lectura) y un servidor "clone" (acceso completo), verificando si están sincronizadas usando checksums. Si no lo están, puede sincronizar automáticamente copiando datos de target a clone usando MERGE para upsert.
+PClone es una aplicación web completa para comparar y sincronizar tablas entre servidores SQL Server. Incluye una interfaz intuitiva para gestionar presets de configuración, programar tareas automáticas y monitorear el estado de sincronización en tiempo real.
+
+## Características
+
+- **Interfaz Web Intuitiva**: Gestiona sincronizaciones desde el navegador
+- **Presets de Configuración**: Guarda y reutiliza configuraciones de sincronización
+- **Programación Automática**: Crea trabajos cron para ejecuciones programadas
+- **Monitoreo en Tiempo Real**: Visualiza logs y progreso de sincronización
+- **Sincronización Segura**: Compara tablas usando checksums antes de actualizar
+- **Soporte Multi-usuario**: Cada usuario tiene sus propios presets y trabajos
+- **Responsive Design**: Funciona en desktop y dispositivos móviles
 
 ## Requisitos
 
-- Node.js instalado.
-- Acceso a dos servidores SQL Server: target (solo lectura) y clone (lectura/escritura).
-- Las tablas deben tener una clave primaria definida en `tables.json`.
+- Node.js instalado (versión 18+)
+- Acceso a dos servidores SQL Server: target (solo lectura) y clone (lectura/escritura)
+- Navegador web moderno
 
 ## Instalación
 
@@ -24,131 +34,147 @@ Este script permite comparar una tabla entre un servidor "target" (solo lectura)
 3. Configura variables de entorno:
    ```bash
    cp .env.example .env
-   # Edita .env con tus credenciales
+   # Edita .env con tus credenciales de base de datos
    ```
 
-4. (Opcional) Genera distribuible standalone:
+4. Inicia el servidor:
    ```bash
-   npm run dist
+   npm start
    ```
-   Los ejecutables se generan en `dist/` (no requieren Node.js).
 
-5. Los logs se guardan en `sync.log` y se muestran en consola.
+5. Abre tu navegador en `http://localhost:3000`
 
-## Configuración
+## Configuración Inicial
 
-Edita las variables de entorno o modifica `config.js` con las credenciales reales:
+### Variables de Entorno (.env)
 
-- `TARGET_SERVER`: Servidor target.
-- `TARGET_DB`: Base de datos target.
-- `TARGET_USER`: Usuario target (solo lectura).
-- `TARGET_PASS`: Contraseña target.
-
-- `CLONE_SERVER`: Servidor clone.
-- `CLONE_DB`: Base de datos clone.
-- `CLONE_USER`: Usuario clone (con permisos de escritura).
-- `CLONE_PASS`: Contraseña clone.
-
-Ejemplo de ejecución con variables de entorno:
-
-```bash
-export TARGET_SERVER=server1
-export TARGET_DB=myDB
-# ... otros
-node index.js MiTabla
+```env
+PORT=3000
+API_KEY=tu-api-key-segura
+TARGET_SERVER=servidor-target
+TARGET_DB=base-datos-target
+TARGET_USER=usuario-target
+TARGET_PASS=contraseña-target
+CLONE_SERVER=servidor-clone
+CLONE_DB=base-datos-clone
+CLONE_USER=usuario-clone
+CLONE_PASS=contraseña-clone
 ```
 
-## Configuración de Tablas
+### Usuarios
 
-Edita `tables.json` con la lista de tablas a sincronizar, sus columnas de clave primaria (array para PK compuestas), intervalo de sincronización en minutos y prioridad de ejecución:
+Los usuarios se definen en `users.txt` con formato:
+```
+usuario:hash-sha256
+```
+
+Ejemplo:
+```
+admin:a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3
+```
+
+### Tablas por Defecto
+
+Configura `tables.json` con las tablas disponibles para sincronizar:
 
 ```json
 [
   {
     "table": "Usuarios",
-    "pk": ["UsuarioID"],
-    "syncIntervalMinutes": 5,
-    "priority": 1
+    "pk": ["UsuarioID"]
   },
   {
     "table": "Productos",
-    "pk": ["ProductoID"],
-    "syncIntervalMinutes": 30,
-    "priority": 1
-  },
-  {
-    "table": "Pedidos",
-    "pk": ["PedidoID", "ProductoID"],
-    "syncIntervalMinutes": 60,
-    "priority": 2
+    "pk": ["ProductoID"]
   }
 ]
 ```
 
-- `pk`: Array de columnas que forman la clave primaria (soporta PK compuestas).
-- `syncIntervalMinutes`: Minutos entre verificaciones en el cron job.
-- `priority`: Número para orden de ejecución (menor = primero, para tablas base antes de dependientes).
+## Uso de la Interfaz Web
 
-## Uso
+### 1. Inicio de Sesión
 
-### Verificar sincronización de una tabla específica
+- Accede a `http://localhost:3000`
+- Ingresa tus credenciales definidas en `users.txt`
 
-```bash
-node index.js MiTabla --sync
-```
+### 2. Gestión de Presets
 
-Usa `PK_COLUMN=id` si no está en tables.json.
+#### Crear un Preset
+1. Ve a la pestaña "Presets"
+2. Haz clic en "Programar" para crear un nuevo preset
+3. Configura:
+   - **Servidor Target**: Servidor de origen (solo lectura)
+   - **Base de Datos Target**: BD de origen
+   - **Credenciales Target**: Usuario y contraseña
+   - **Servidor Clone**: Servidor destino (lectura/escritura)
+   - **Base de Datos Clone**: BD destino
+   - **Credenciales Clone**: Usuario y contraseña
+   - **Tablas**: Agrega tablas con sus claves primarias
+   - **API Key**: Clave de API para autenticación
+   - **Sincronizar**: Activa para actualizar datos, desactiva para solo comparar
 
-### Verificar y sincronizar todas las tablas
+#### Ejecutar un Preset
+- En la lista de presets, haz clic en "Ejecutar"
+- Los resultados se muestran en tiempo real en la sección de logs
 
-```bash
-node index.js --sync
-```
+#### Ejecutar Todos los Presets
+- Haz clic en "Ejecutar Todos" para procesar todos los presets en secuencia
 
-Procesa todas las tablas desde `tables.json`.
+### 3. Programación Automática
 
-### Sincronización automática (para cron)
+#### Crear un Trabajo Programado
+1. En la pestaña "Presets", haz clic en "Programar"
+2. Selecciona un preset existente
+3. Elige la frecuencia:
+   - **Cada X minutos**: Especifica el intervalo
+   - **Cada X horas**: Especifica el intervalo
+   - **Diariamente**: Selecciona la hora
+   - **Semanalmente**: Selecciona día y hora
+   - **Mensualmente**: Selecciona día del mes y hora
+4. El sistema genera automáticamente la expresión cron
 
-```bash
-node sync-cron.js
-```
+#### Gestionar Trabajos Programados
+- Ver trabajos activos en "Trabajos Programados"
+- Detener trabajos con el botón "Detener"
+- Los trabajos se ejecutan automáticamente según el horario configurado
 
-Sincroniza todas las tablas automáticamente.
+### 4. Monitoreo
 
-#### Configuración de Cron Job
+- **Logs en Tiempo Real**: Visualiza el progreso de cada tabla
+- **Estados de Sincronización**: Verifica si las tablas están actualizadas
+- **Historial de Ejecuciones**: Consulta logs anteriores en la consola del servidor
 
-El script usa lock files (`sync.lock`) para evitar ejecuciones concurrentes. Configura el cron externo con la frecuencia mínima de tus tablas (ej. cada 5 min si hay tablas con 5 min intervalo). Si configuras frecuencia mayor, algunas tablas se sincronizarán menos.
+## Arquitectura del Sistema
 
-- **En Linux/macOS**: Agrega a crontab (`crontab -e`):
-  ```
-  */5 * * * * cd /path/to/project && node sync-cron.js
-  ```
-  (Ejecuta cada 5 minutos; ajusta al mínimo intervalo de tus tablas).
+### Backend (server.js)
+- **API REST**: Endpoints para gestión de presets y sincronización
+- **Autenticación**: Sistema de usuarios con hash SHA-256
+- **Programación**: Integración con node-cron para trabajos automáticos
+- **Procesamiento**: Lógica de comparación y sincronización de tablas
 
-- **En Windows (Task Scheduler)**:
-  1. Abre Task Scheduler (busca "Task Scheduler" en el menú Inicio).
-  2. Haz clic en "Create Basic Task" (o "Create Task" para más opciones).
-  3. Nombre: "Sync DB Tables".
-  4. Trigger: "On a schedule", elige "Repeat task every" y ajusta al intervalo mínimo de tus tablas (ej. 5 minutes).
-  5. Action: "Start a program".
-     - Program/script: `C:\Windows\System32\cmd.exe`
-     - Add arguments (opcional): `/c cd /d "C:\path\to\your\project" && node sync-cron.js`
-     - O configura el "Start in" directory en la pestaña adicional.
-  6. Configura condiciones (ej. solo si conectado a red).
-  7. Guarda y prueba ejecutando manualmente.
+### Frontend (public/)
+- **Interfaz Responsive**: Bootstrap 5 con diseño móvil
+- **JavaScript Asíncrono**: Actualizaciones en tiempo real sin recargar
+- **Gestión de Estado**: Manejo de sesiones y configuración del usuario
 
-## Notas
+### Seguridad
+- **Autenticación por Usuario**: Cada usuario tiene sus propios presets
+- **API Keys**: Protección de endpoints con claves de API
+- **Validación de Datos**: Verificación de entradas en frontend y backend
 
-- Las claves primarias se definen en `tables.json`. Para una tabla específica, usa `PK_COLUMN` env var.
-- Para tablas relacionadas, ordena `tables.json` por dependencias (padres primero).
-- Maneja tipos de datos básicos, incluyendo VARBINARY/IMAGE (convierte a hex); para tipos muy complejos, verificar.
-- No elimina filas en clone que no estén en target (solo upsert).
-- Reintentos automáticos: Hasta 3 reintentos con backoff exponencial para errores de conexión o queries.
+## Notas Técnicas
+
+- Las claves primarias se definen en `tables.json`
+- Soporta claves primarias compuestas
+- Maneja tipos de datos básicos, incluyendo VARBINARY/IMAGE
+- No elimina filas en clone que no estén en target (solo upsert)
+- Reintentos automáticos con backoff exponencial
 
 ## Limitaciones
 
-- No maneja deletes en clone.
-- Batch size fijo en 100; ajusta para rendimiento.
-- Requiere que las tablas tengan la misma estructura.
+- No maneja deletes en clone
+- Batch size fijo en 100 filas
+- Requiere que las tablas tengan la misma estructura
+- Trabajos cron se pierden al reiniciar el servidor (persistencia futura)
 
-Si necesitas más funcionalidades, edita el código.
+Si necesitas más funcionalidades, edita el código fuente.

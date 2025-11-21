@@ -356,32 +356,21 @@ async function processSyncTask(taskId) {
           task.logs.push(`Error en tabla ${tableConfig.table}: ${result.error}`);
         } else {
           const synced = typeof result === 'object' ? result.synced : result;
-          if (synced === false) {
-            // Asumir error si retorna false (compatibilidad con compare.js actual)
-            task.results.push({
-              table: tableConfig.table,
-              status: 'error',
-              message: 'Error en comparación: Falló la conexión o comparación',
-              changed: null
-            });
-            task.logs.push(`Error en tabla ${tableConfig.table}: Error en comparación`);
+          let message;
+          if (synced) {
+            message = task.payload.sync ? 'No se encontraron cambios en la tabla' : 'Comparación completada, no hay cambios';
           } else {
-            let message;
-            if (synced) {
-              message = task.payload.sync ? 'No se encontraron cambios en la tabla' : 'Comparación completada, no hay cambios';
-            } else {
-              message = task.payload.sync ? 'Tabla actualizada con éxito' : 'Comparación completada, se encontraron cambios';
-            }
-
-            task.results.push({
-              table: tableConfig.table,
-              status: 'success',
-              message: message,
-              changed: !synced
-            });
-
-            task.logs.push(`Procesamiento de tabla ${tableConfig.table}: ${message}`);
+            message = task.payload.sync ? 'Tabla actualizada con éxito' : 'Comparación completada, se encontraron cambios';
           }
+
+          task.results.push({
+            table: tableConfig.table,
+            status: 'success',
+            message: message,
+            changed: !synced
+          });
+
+          task.logs.push(`Procesamiento de tabla ${tableConfig.table}: ${message}`);
         }
 
       } catch (error) {
