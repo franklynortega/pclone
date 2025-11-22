@@ -1,6 +1,7 @@
 let currentUser = null;
 let taskId = null;
 let pollingInterval = null;
+let logsAutoRefreshInterval = null;
 
 // Elementos DOM
 const loginSection = document.getElementById('login-section');
@@ -15,6 +16,7 @@ const backBtn = document.getElementById('back-btn');
 const addTableBtn = document.getElementById('add-table-btn');
 const loadDefaultTablesBtn = document.getElementById('load-default-tables-btn');
 const tablesContainer = document.getElementById('tables-container');
+const testConnectionBtn = document.getElementById('test-connection-btn');
 const executeAllPresetsBtn = document.getElementById('execute-all-presets-btn');
 const confirmExecuteAllBtn = document.getElementById('confirm-execute-all-btn');
 const schedulePresetBtn = document.getElementById('schedule-preset-btn');
@@ -23,6 +25,11 @@ const presetsList = document.getElementById('presets-list');
 const schedulesList = document.getElementById('schedules-list');
 const configTab = document.getElementById('config-tab');
 const presetsTab = document.getElementById('presets-tab');
+const logsTab = document.getElementById('logs-tab');
+const loadLogsBtn = document.getElementById('load-logs-btn');
+const clearFiltersBtn = document.getElementById('clear-filters-btn');
+const autoRefreshLogs = document.getElementById('auto-refresh-logs');
+const logsResults = document.getElementById('logs-results');
 
 // Inicialización
 document.addEventListener('DOMContentLoaded', () => {
@@ -33,10 +40,14 @@ document.addEventListener('DOMContentLoaded', () => {
     backBtn.addEventListener('click', showConfig);
     addTableBtn.addEventListener('click', addTableEntry);
     loadDefaultTablesBtn.addEventListener('click', loadDefaultTables);
+    testConnectionBtn.addEventListener('click', testConnection);
     executeAllPresetsBtn.addEventListener('click', executeAllPresets);
     confirmExecuteAllBtn.addEventListener('click', executeAllPresets);
     schedulePresetBtn.addEventListener('click', showScheduleModal);
     confirmScheduleBtn.addEventListener('click', schedulePreset);
+    loadLogsBtn.addEventListener('click', loadLogs);
+    clearFiltersBtn.addEventListener('click', clearLogFilters);
+    autoRefreshLogs.addEventListener('change', toggleAutoRefresh);
 
     // Cargar presets al inicio
     loadPresets();
@@ -181,7 +192,7 @@ function getConfig() {
 
     // Validar campos requeridos
     const requiredFields = ['targetServer', 'targetDb', 'targetUser', 'targetPass',
-                           'cloneServer', 'cloneDb', 'cloneUser', 'clonePass', 'apiKey'];
+        'cloneServer', 'cloneDb', 'cloneUser', 'clonePass', 'apiKey'];
     for (const field of requiredFields) {
         if (!config[field]) {
             showError('config-error', `Campo ${field} es requerido`);
@@ -276,6 +287,68 @@ async function loadDefaultTables() {
     }
 }
 
+async function testConnection() {
+    const config = getConfig();
+    if (!config) return;
+
+    // Deshabilitar botón durante el test
+    testConnectionBtn.disabled = true;
+    testConnectionBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Probando...';
+
+    const resultDiv = document.getElementById('connection-test-result');
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = '<div class="alert alert-info">Probando conexiones...</div>';
+
+    try {
+        const response = await fetch('/api/test-connection', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': config.apiKey
+            },
+            body: JSON.stringify({
+                targetServer: config.targetServer,
+                targetDb: config.targetDb,
+                targetUser: config.targetUser,
+                targetPass: config.targetPass,
+                cloneServer: config.cloneServer,
+                cloneDb: config.cloneDb,
+                cloneUser: config.cloneUser,
+                clonePass: config.clonePass
+            })
+        });
+
+        const data = await response.json();
+
+        let resultHtml = '<div class="alert alert-success">Resultados del test de conexión:</div>';
+        resultHtml += '<ul class="list-group mt-2">';
+
+        // Target result
+        if (data.target.success) {
+            resultHtml += '<li class="list-group-item list-group-item-success"><i class="bi bi-check-circle-fill"></i> Base de Datos Origen: Conexión exitosa</li>';
+        } else {
+            resultHtml += `<li class="list-group-item list-group-item-danger"><i class="bi bi-x-circle-fill"></i> Base de Datos Origen: Error - ${data.target.error}</li>`;
+        }
+
+        // Clone result
+        if (data.clone.success) {
+            resultHtml += '<li class="list-group-item list-group-item-success"><i class="bi bi-check-circle-fill"></i> Base de Datos Destino: Conexión exitosa</li>';
+        } else {
+            resultHtml += `<li class="list-group-item list-group-item-danger"><i class="bi bi-x-circle-fill"></i> Base de Datos Destino: Error - ${data.clone.error}</li>`;
+        }
+
+        resultHtml += '</ul>';
+        resultDiv.innerHTML = resultHtml;
+
+    } catch (error) {
+        resultDiv.innerHTML = '<div class="alert alert-danger">Error probando conexiones</div>';
+    } finally {
+        // Rehabilitar botón
+        testConnectionBtn.disabled = false;
+        testConnectionBtn.innerHTML = '<i class="bi bi-wifi"></i> Testear Conexión a Bases de Datos';
+    }
+}
+
 // Funciones de ejecución
 async function executeTask() {
     const config = getConfig();
@@ -301,7 +374,6 @@ async function executeTask() {
                 sync: config.sync
             })
         });
-
         const data = await response.json();
         if (response.ok) {
             taskId = data.taskId;
@@ -607,7 +679,7 @@ async function executePresetSequentiallyInline(presetName) {
             const response = await fetch(`/presets/${presetName}`, {
                 headers: { 'x-username': currentUser }
             });
-    
+
             const data = await response.json();
             if (data.config) {
                 const config = data.config;
@@ -930,5 +1002,106 @@ async function stopSchedule(id) {
         }
     } catch (error) {
         alert('Error de conexión');
+    }
+}
+
+// Funciones de visor de logs
+async function loadLogs() {
+    const level = document.getElementById('log-level-filter').value;
+    const startDate = document.getElementById('log-start-date').value;
+    const endDate = document.getElementById('log-end-date').value;
+    const search = document.getElementById('log-search').value.trim();
+
+    // Deshabilitar botón durante carga
+    loadLogsBtn.disabled = true;
+    loadLogsBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Cargando...';
+
+    try {
+        const params = new URLSearchParams();
+        if (level) params.append('level', level);
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+        if (search) params.append('search', search);
+
+        const response = await fetch(`/logs?${params}`, {
+            headers: { 'x-api-key': 'default-api-key' }
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            displayLogs(data.logs, data.total);
+        } else {
+            logsResults.innerHTML = `<div class="alert alert-danger">Error: ${data.error}</div>`;
+        }
+    } catch (error) {
+        logsResults.innerHTML = '<div class="alert alert-danger">Error de conexión al cargar logs</div>';
+    } finally {
+        // Rehabilitar botón
+        loadLogsBtn.disabled = false;
+        loadLogsBtn.innerHTML = '<i class="bi bi-search"></i> Cargar Logs';
+    }
+}
+
+function displayLogs(logs, total) {
+    if (logs.length === 0) {
+        logsResults.innerHTML = '<div class="alert alert-info">No se encontraron logs con los filtros aplicados.</div>';
+        return;
+    }
+
+    let html = `<div class="alert alert-success">Mostrando ${logs.length} de ${total} logs encontrados</div>`;
+    html += '<div class="table-responsive"><table class="table table-striped table-sm">';
+    html += '<thead><tr><th>Fecha/Hora</th><th>Nivel</th><th>Mensaje</th></tr></thead><tbody>';
+
+    logs.forEach(log => {
+        const date = new Date(log.timestamp);
+        const formattedDate = date.toLocaleString('es-ES', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+
+        let levelClass = 'text-muted';
+        switch (log.level) {
+            case 'error': levelClass = 'text-danger'; break;
+            case 'warn': levelClass = 'text-warning'; break;
+            case 'info': levelClass = 'text-info'; break;
+            case 'debug': levelClass = 'text-secondary'; break;
+        }
+
+        html += `<tr>
+            <td class="text-nowrap">${formattedDate}</td>
+            <td><span class="${levelClass}">${log.level.toUpperCase()}</span></td>
+            <td style="word-break: break-word;">${log.message}</td>
+        </tr>`;
+    });
+
+    html += '</tbody></table></div>';
+    logsResults.innerHTML = html;
+}
+
+function clearLogFilters() {
+    document.getElementById('log-level-filter').value = '';
+    document.getElementById('log-start-date').value = '';
+    document.getElementById('log-end-date').value = '';
+    document.getElementById('log-search').value = '';
+    logsResults.innerHTML = '<div class="alert alert-info">Filtros limpiados. Haz clic en "Cargar Logs" para ver todos los registros.</div>';
+}
+
+function toggleAutoRefresh() {
+    if (autoRefreshLogs.checked) {
+        logsAutoRefreshInterval = setInterval(() => {
+            if (document.getElementById('logs-panel').classList.contains('show')) {
+                loadLogs();
+            }
+        }, 30000); // 30 segundos
+    } else {
+        if (logsAutoRefreshInterval) {
+            clearInterval(logsAutoRefreshInterval);
+            logsAutoRefreshInterval = null;
+        }
     }
 }

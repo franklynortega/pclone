@@ -6,6 +6,7 @@ import logger from './logger.js';
 import fs from 'fs';
 import crypto from 'crypto';
 import cron from 'node-cron';
+import sql from 'mssql';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -306,6 +307,120 @@ app.delete('/schedule/:id', authenticate, (req, res) => {
     res.json({ message: 'Trabajo detenido' });
   } else {
     res.status(404).json({ error: 'Trabajo no encontrado' });
+  }
+});
+
+// Endpoint GET /logs
+app.get('/logs', authenticate, (req, res) => {
+  try {
+    const { level, startDate, endDate, search, limit = 100 } = req.query;
+
+    // Leer archivo de logs
+    const logContent = fs.readFileSync('sync.log', 'utf8');
+    const logLines = logContent.trim().split('\n').filter(line => line.trim());
+
+    let logs = logLines.map(line => {
+      try {
+        return JSON.parse(line);
+      } catch (e) {
+        return null;
+      }
+    }).filter(log => log !== null);
+
+    // Aplicar filtros
+    if (level) {
+      logs = logs.filter(log => log.level === level);
+    }
+
+    if (startDate) {
+      const start = new Date(startDate);
+      logs = logs.filter(log => new Date(log.timestamp) >= start);
+    }
+
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999); // Fin del día
+      logs = logs.filter(log => new Date(log.timestamp) <= end);
+    }
+
+    if (search) {
+      const searchLower = search.toLowerCase();
+      logs = logs.filter(log => log.message.toLowerCase().includes(searchLower));
+    }
+
+    // Ordenar por timestamp descendente (más recientes primero)
+    logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    // Limitar resultados
+    const limitedLogs = logs.slice(0, parseInt(limit));
+
+    res.json({ logs: limitedLogs, total: logs.length });
+  } catch (error) {
+    logger.error('Error obteniendo logs:', error);
+    res.status(500).json({ error: 'Error obteniendo logs' });
+  }
+});
+
+// Endpoint POST /api/test-connection
+app.post('/api/test-connection', authenticate, async (req, res) => {
+  try {
+    const { targetServer, targetDb, targetUser, targetPass, cloneServer, cloneDb, cloneUser, clonePass } = req.body;
+
+    const results = {
+      target: { success: false, error: null },
+      clone: { success: false, error: null }
+    };
+
+    // Test Target connection
+    try {
+      const targetConfig = {
+        server: targetServer,
+        database: targetDb,
+        user: targetUser,
+        password: targetPass,
+        options: {
+          encrypt: false,
+          trustServerCertificate: true,
+          connectionTimeout: 5000,
+          requestTimeout: 5000
+        }
+      };
+
+      const targetPool = new sql.ConnectionPool(targetConfig);
+      await targetPool.connect();
+      await targetPool.close();
+      results.target.success = true;
+    } catch (error) {
+      results.target.error = error.message;
+    }
+
+    // Test Clone connection
+    try {
+      const cloneConfig = {
+        server: cloneServer,
+        database: cloneDb,
+        user: cloneUser,
+        password: clonePass,
+        options: {
+          encrypt: false,
+          trustServerCertificate: true,
+          connectionTimeout: 5000,
+          requestTimeout: 5000
+        }
+      };
+
+      const clonePool = new sql.ConnectionPool(cloneConfig);
+      await clonePool.connect();
+      await clonePool.close();
+      results.clone.success = true;
+    } catch (error) {
+      results.clone.error = error.message;
+    }
+
+    res.json(results);
+  } catch (error) {
+    logger.error('Error en POST /api/test-connection:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 
