@@ -1,0 +1,20 @@
+# 1. IMAGEN BASE
+FROM node:20-slim
+
+# 2. DIRECTORIO DE TRABAJO
+WORKDIR /usr/src/app
+
+# 3. COPIAR ARCHIVOS DE CONFIGURACIÓN
+COPY package*.json ./
+
+# 4. INSTALAR DEPENDENCIAS
+RUN npm install
+
+# 5. COPIAR EL CÓDIGO FUENTE
+COPY . .
+
+# 6. PUERTO DE LA APLICACIÓN
+EXPOSE 3000
+
+# 7. COMANDO DE INICIO
+CMD [ "node", "server.js" ]
