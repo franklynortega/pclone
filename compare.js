@@ -202,104 +202,91 @@ async function compareTable(tableName, pkColumns, sync) {
     if (targetPool) await targetPool.close();
     if (clonePool) await clonePool.close();
   }
-}
 
-async function syncTable(targetPool, clonePool, tableName, pkColumns) {
-  logger.info(`Iniciando sincronización de tabla ${tableName}...`);
-  try {
-    // 1. Obtener columnas
-    const columns = await getColumns(targetPool, tableName);
-    const columnNames = columns.map(c => `[${c.name}]`).join(', ');
+  const table = new sql.Table(`#Temp_${tableName.replace(/[^a-zA-Z0-9_]/g, '')}`);
+  table.create = true;
 
-    // 2. Leer datos de Target
-    const request = targetPool.request();
-    request.stream = true;
-    request.query(`SELECT ${columnNames} FROM ${tableName}`);
+  columns.forEach(col => {
+    let type;
+    if (col.type.toLowerCase().includes('int')) type = sql.Int;
+    else if (col.type.toLowerCase().includes('varchar')) type = sql.NVarChar(sql.MAX);
+    else if (col.type.toLowerCase().includes('datetime')) type = sql.DateTime;
+    else if (col.type.toLowerCase().includes('bit')) type = sql.Bit;
+    else if (col.type.toLowerCase().includes('decimal')) type = sql.Decimal(18, 5);
+    else type = sql.NVarChar(sql.MAX);
 
-    const table = new sql.Table(`#Temp_${tableName.replace(/[^a-zA-Z0-9_]/g, '')}`);
-    table.create = true;
+    table.columns.add(col.name, type, { nullable: col.nullable });
+  });
 
-    columns.forEach(col => {
-      let type;
-      if (col.type.toLowerCase().includes('int')) type = sql.Int;
-      else if (col.type.toLowerCase().includes('varchar')) type = sql.NVarChar(sql.MAX);
-      else if (col.type.toLowerCase().includes('datetime')) type = sql.DateTime;
-      else if (col.type.toLowerCase().includes('bit')) type = sql.Bit;
-      else if (col.type.toLowerCase().includes('decimal')) type = sql.Decimal(18, 5);
-      else type = sql.NVarChar(sql.MAX);
+  const rows = [];
 
-      table.columns.add(col.name, type, { nullable: col.nullable });
+  return new Promise((resolve, reject) => {
+    request.on('row', row => {
+      const values = [];
+      for (const col of columns) {
+        values.push(row[col.name]);
+      }
+      table.rows.add(...values);
     });
 
-    const rows = [];
+    request.on('error', err => {
+      reject(err);
+    });
 
-    return new Promise((resolve, reject) => {
-      request.on('row', row => {
-        const values = [];
-        for (const col of columns) {
-          values.push(row[col.name]);
-        }
-        table.rows.add(...values);
-      });
+    request.on('done', async () => {
+      try {
+        // 3. Bulk Insert a tabla temporal en Clone
+        const cloneRequest = clonePool.request();
 
-      request.on('error', err => {
-        reject(err);
-      });
+        // Crear tabla temporal manualmente para asegurar tipos
+        const colDefs = columns.map(c => {
+          let typeDef = c.type;
+          if (c.maxLength && c.maxLength > 0 && (c.type.includes('char') || c.type.includes('binary'))) {
+            typeDef += `(${c.maxLength})`;
+          } else if (c.maxLength === -1 && (c.type.includes('char') || c.type.includes('binary'))) {
+            typeDef += '(MAX)';
+          }
+          if (c.precision && c.scale && (c.type.includes('decimal') || c.type.includes('numeric'))) {
+            typeDef += `(${c.precision},${c.scale})`;
+          }
+          return `[${c.name}] ${typeDef}`;
+        }).join(', ');
 
-      request.on('done', async () => {
-        try {
-          // 3. Bulk Insert a tabla temporal en Clone
-          const cloneRequest = clonePool.request();
+        const tempTableName = `#Temp_${tableName.replace(/[^a-zA-Z0-9_]/g, '')}`;
+        await cloneRequest.query(`IF OBJECT_ID('tempdb..${tempTableName}') IS NOT NULL DROP TABLE ${tempTableName}; CREATE TABLE ${tempTableName} (${colDefs})`);
 
-          // Crear tabla temporal manualmente para asegurar tipos
-          const colDefs = columns.map(c => {
-            let typeDef = c.type;
-            if (c.maxLength && c.maxLength > 0 && (c.type.includes('char') || c.type.includes('binary'))) {
-              typeDef += `(${c.maxLength})`;
-            } else if (c.maxLength === -1 && (c.type.includes('char') || c.type.includes('binary'))) {
-              typeDef += '(MAX)';
-            }
-            if (c.precision && c.scale && (c.type.includes('decimal') || c.type.includes('numeric'))) {
-              typeDef += `(${c.precision},${c.scale})`;
-            }
-            return `[${c.name}] ${typeDef}`;
-          }).join(', ');
+        // Bulk Insert
+        const bulkTable = new sql.Table(tempTableName);
+        bulkTable.create = false; // Ya la creamos
+        columns.forEach(col => {
+          let type = sql.NVarChar(sql.MAX);
+          const t = col.type.toLowerCase();
+          if (t.includes('int')) type = sql.Int;
+          else if (t.includes('bigint')) type = sql.BigInt;
+          else if (t.includes('smallint')) type = sql.SmallInt;
+          else if (t.includes('tinyint')) type = sql.TinyInt;
+          else if (t.includes('bit')) type = sql.Bit;
+          else if (t.includes('datetime')) type = sql.DateTime;
+          else if (t.includes('date')) type = sql.Date;
+          else if (t.includes('decimal') || t.includes('numeric')) type = sql.Decimal(col.precision, col.scale);
+          else if (t.includes('float')) type = sql.Float;
+          else if (t.includes('real')) type = sql.Real;
+          else if (t.includes('binary') || t.includes('image')) type = sql.VarBinary(sql.MAX);
 
-          const tempTableName = `#Temp_${tableName.replace(/[^a-zA-Z0-9_]/g, '')}`;
-          await cloneRequest.query(`IF OBJECT_ID('tempdb..${tempTableName}') IS NOT NULL DROP TABLE ${tempTableName}; CREATE TABLE ${tempTableName} (${colDefs})`);
+          bulkTable.columns.add(col.name, type, { nullable: true });
+        });
 
-          // Bulk Insert
-          const bulkTable = new sql.Table(tempTableName);
-          bulkTable.create = false; // Ya la creamos
-          columns.forEach(col => {
-            let type = sql.NVarChar(sql.MAX);
-            const t = col.type.toLowerCase();
-            if (t.includes('int')) type = sql.Int;
-            else if (t.includes('bigint')) type = sql.BigInt;
-            else if (t.includes('smallint')) type = sql.SmallInt;
-            else if (t.includes('tinyint')) type = sql.TinyInt;
-            else if (t.includes('bit')) type = sql.Bit;
-            else if (t.includes('datetime')) type = sql.DateTime;
-            else if (t.includes('date')) type = sql.Date;
-            else if (t.includes('decimal') || t.includes('numeric')) type = sql.Decimal(col.precision, col.scale);
-            else if (t.includes('float')) type = sql.Float;
-            else if (t.includes('real')) type = sql.Real;
-            else if (t.includes('binary') || t.includes('image')) type = sql.VarBinary(sql.MAX);
+        table.rows.forEach(row => bulkTable.rows.add(...row));
 
-            bulkTable.columns.add(col.name, type, { nullable: true });
-          });
+        await cloneRequest.bulk(bulkTable);
 
-          table.rows.forEach(row => bulkTable.rows.add(...row));
+        // 4. MERGE
+        const pkMatch = pkColumns.map(pk => `T.[${pk}] = S.[${pk}]`).join(' AND ');
+        const updateSet = columns.filter(c => !pkColumns.includes(c.name) && !c.isComputed).map(c => `T.[${c.name}] = S.[${c.name}]`).join(', ');
+        const insertCols = columns.filter(c => !c.isComputed).map(c => `[${c.name}]`).join(', ');
+        const insertVals = columns.filter(c => !c.isComputed).map(c => `S.[${c.name}]`).join(', ');
 
-          await cloneRequest.bulk(bulkTable);
-
-          // 4. MERGE
-          const pkMatch = pkColumns.map(pk => `T.[${pk}] = S.[${pk}]`).join(' AND ');
-          const updateSet = columns.filter(c => !pkColumns.includes(c.name) && !c.isComputed).map(c => `T.[${c.name}] = S.[${c.name}]`).join(', ');
-          const insertCols = columns.filter(c => !c.isComputed).map(c => `[${c.name}]`).join(', ');
-          const insertVals = columns.filter(c => !c.isComputed).map(c => `S.[${c.name}]`).join(', ');
-
-          const mergeQuery = `
+        const mergeQuery = `
             MERGE ${tableName} AS T
             USING ${tempTableName} AS S
             ON (${pkMatch})
@@ -312,20 +299,20 @@ async function syncTable(targetPool, clonePool, tableName, pkColumns) {
             DROP TABLE ${tempTableName};
           `;
 
-          await cloneRequest.query(mergeQuery);
-          logger.info(`Sincronización de tabla ${tableName} completada exitosamente.`);
-          resolve(true);
+        await cloneRequest.query(mergeQuery);
+        logger.info(`Sincronización de tabla ${tableName} completada exitosamente.`);
+        resolve(true);
 
-        } catch (err) {
-          reject(err);
-        }
-      });
+      } catch (err) {
+        reject(err);
+      }
     });
+  });
 
-  } catch (error) {
-    logger.error(`Error sincronizando tabla ${tableName}: ${error.message}`, error);
-    throw error;
-  }
+} catch (error) {
+  logger.error(`Error sincronizando tabla ${tableName}: ${error.message}`, error);
+  throw error;
+}
 }
 
 export { compareTable };
