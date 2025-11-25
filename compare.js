@@ -269,33 +269,6 @@ async function syncTable(targetPool, clonePool, tableName, pkColumns) {
           }).join(', ');
 
           const tempTableName = `#Temp_${tableName.replace(/[^a-zA-Z0-9_]/g, '')}`;
-          await cloneRequest.query(`IF OBJECT_ID('tempdb..${tempTableName}') IS NOT NULL DROP TABLE ${tempTableName}; CREATE TABLE ${tempTableName} (${colDefs})`);
-
-          // Bulk Insert
-          const bulkTable = new sql.Table(tempTableName);
-          bulkTable.create = false; // Ya la creamos
-          columns.forEach(col => {
-            let type = sql.NVarChar(sql.MAX);
-            const t = col.type.toLowerCase();
-            if (t.includes('int')) type = sql.Int;
-            else if (t.includes('bigint')) type = sql.BigInt;
-            else if (t.includes('smallint')) type = sql.SmallInt;
-            else if (t.includes('tinyint')) type = sql.TinyInt;
-            else if (t.includes('bit')) type = sql.Bit;
-            else if (t.includes('datetime')) type = sql.DateTime;
-            else if (t.includes('date')) type = sql.Date;
-            else if (t.includes('decimal') || t.includes('numeric')) type = sql.Decimal(col.precision, col.scale);
-            else if (t.includes('float')) type = sql.Float;
-            else if (t.includes('real')) type = sql.Real;
-            else if (t.includes('binary') || t.includes('image')) type = sql.VarBinary(sql.MAX);
-
-            bulkTable.columns.add(col.name, type, { nullable: true });
-          });
-
-          table.rows.forEach(row => bulkTable.rows.add(...row));
-
-          await cloneRequest.bulk(bulkTable);
-
           // 4. MERGE
           const pkMatch = pkColumns.map(pk => `T.[${pk}] = S.[${pk}]`).join(' AND ');
           const updateSet = columns.filter(c => !pkColumns.includes(c.name) && !c.isComputed).map(c => `T.[${c.name}] = S.[${c.name}]`).join(', ');
