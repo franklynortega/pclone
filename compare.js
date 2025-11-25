@@ -196,7 +196,7 @@ async function compareTable(tableName, pkColumns, sync) {
       return false;
     }
   } catch (error) {
-    logger.error('Error en comparación:', error);
+    logger.error(`Error en comparación para tabla ${tableName}: ${error.message}`, { stack: error.stack });
     return false;
   } finally {
     if (targetPool) await targetPool.close();
@@ -323,7 +323,7 @@ async function syncTable(targetPool, clonePool, tableName, pkColumns) {
     });
 
   } catch (error) {
-    logger.error(`Error sincronizando tabla ${tableName}:`, error);
+    logger.error(`Error sincronizando tabla ${tableName}: ${error.message}`, error);
     throw error;
   }
 }
