@@ -146,60 +146,63 @@ function formatValueForParam(val, type) {
   if (type && type.toLowerCase().includes('varchar')) return sql.NText;
   if (type && type.toLowerCase().includes('nvarchar')) return sql.NText;
   if (type && type.toLowerCase().includes('datetime')) return sql.DateTime;
-  const targetColumns = await getColumns(targetPool, tableName);
-  const cloneColumns = await getColumns(clonePool, tableName);
-  const commonColumns = targetColumns.filter(tc => cloneColumns.some(cc => cc.name === tc.name && !tc.isComputed && !cc.isComputed));
-
-  const originalPkColumns = pkColumns;
-  // Filtrar pkColumns para excluir columnas computadas
-  pkColumns = pkColumns.filter(pk => {
-    const col = cloneColumns.find(c => c.name === pk);
-    return col && !col.isComputed;
-  });
-  // Excluir columnas computadas conocidas que no se detectaron
-  if (tableName === 'saArtPrecio') {
-    pkColumns = pkColumns.filter(pk => pk !== 'co_alma_calculado');
-  }
-
-  const minLengths = {};
-  for (const col of commonColumns) {
-    const targetCol = targetColumns.find(tc => tc.name === col.name);
-    const cloneCol = cloneColumns.find(cc => cc.name === col.name);
-    const targetLen = (targetCol && targetCol.maxLength && targetCol.maxLength > 0) ? targetCol.maxLength : 1000;
-    const cloneLen = (cloneCol && cloneCol.maxLength && cloneCol.maxLength > 0) ? cloneCol.maxLength : 1000;
-    minLengths[col.name] = Math.min(targetLen, cloneLen);
-  }
-
-  const targetChecksum = await getChecksumWithColumns(targetPool, tableName, pkColumns, commonColumns, minLengths);
-  const cloneChecksum = await getChecksumWithColumns(clonePool, tableName, pkColumns, commonColumns, minLengths);
-
-  logger.debug(`Checksums - Target: ${targetChecksum}, Clone: ${cloneChecksum}`);
-
-  if (targetChecksum === cloneChecksum) {
-    logger.info(`Tabla ${tableName} no presentó cambios (checksums iguales).`);
-    return true;
-  } else {
-    logger.warn(`Tabla ${tableName} presentó cambios (checksums diferentes).`);
-    if (sync) {
-      await syncTable(tableName, originalPkColumns);
-      // Recalcular checksums después de sincronización
-      const newTargetChecksum = await getChecksumWithColumns(targetPool, tableName, pkColumns, commonColumns, minLengths);
-      const newCloneChecksum = await getChecksumWithColumns(clonePool, tableName, pkColumns, commonColumns, minLengths);
-      if (newTargetChecksum === newCloneChecksum) {
-        logger.info(`Tabla ${tableName} sincronizada exitosamente.`);
-      } else {
-        logger.error(`Tabla ${tableName} aún no sincronizada después de la operación.`);
-      }
-    }
-    return false;
-  }
-} catch (error) {
-  logger.error('Error en comparación:', error);
-  return false;
-} finally {
-  if (targetPool) await targetPool.close();
-  if (clonePool) await clonePool.close();
+  return sql.NVarChar;
 }
+
+async function compareTable(tableName, pkColumns, sync) {
+  let targetPool, clonePool;
+  try {
+    const { targetConfig, cloneConfig } = getConfig();
+    targetPool = await new sql.ConnectionPool(targetConfig).connect();
+    clonePool = await new sql.ConnectionPool(cloneConfig).connect();
+
+    const targetColumns = await getColumns(targetPool, tableName);
+    const cloneColumns = await getColumns(clonePool, tableName);
+    const commonColumns = targetColumns.filter(tc => cloneColumns.some(cc => cc.name === tc.name && !tc.isComputed && !cc.isComputed));
+
+    const originalPkColumns = pkColumns;
+    // Filtrar pkColumns para excluir columnas computadas
+    pkColumns = pkColumns.filter(pk => {
+      const col = cloneColumns.find(c => c.name === pk);
+      return col && !col.isComputed;
+    });
+    // Excluir columnas computadas conocidas que no se detectaron
+    if (tableName === 'saArtPrecio') {
+      pkColumns = pkColumns.filter(pk => pk !== 'co_alma_calculado');
+    }
+
+    const minLengths = {};
+    for (const col of commonColumns) {
+      const targetCol = targetColumns.find(tc => tc.name === col.name);
+      const cloneCol = cloneColumns.find(cc => cc.name === col.name);
+      const targetLen = (targetCol && targetCol.maxLength && targetCol.maxLength > 0) ? targetCol.maxLength : 1000;
+      const cloneLen = (cloneCol && cloneCol.maxLength && cloneCol.maxLength > 0) ? cloneCol.maxLength : 1000;
+      minLengths[col.name] = Math.min(targetLen, cloneLen);
+    }
+
+    const targetChecksum = await getChecksumWithColumns(targetPool, tableName, pkColumns, commonColumns, minLengths);
+    const cloneChecksum = await getChecksumWithColumns(clonePool, tableName, pkColumns, commonColumns, minLengths);
+
+    logger.debug(`Checksums - Target: ${targetChecksum}, Clone: ${cloneChecksum}`);
+
+    if (targetChecksum === cloneChecksum) {
+      logger.info(`Tabla ${tableName} no presentó cambios (checksums iguales).`);
+      return true;
+    } else {
+      logger.warn(`Tabla ${tableName} presentó cambios (checksums diferentes).`);
+      if (sync) {
+        // await syncTable(tableName, originalPkColumns);
+        logger.warn(`Sync requested for ${tableName} but syncTable is not implemented.`);
+      }
+      return false;
+    }
+  } catch (error) {
+    logger.error('Error en comparación:', error);
+    return false;
+  } finally {
+    if (targetPool) await targetPool.close();
+    if (clonePool) await clonePool.close();
+  }
 }
 
 export { compareTable };
