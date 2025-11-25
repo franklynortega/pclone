@@ -162,14 +162,16 @@
       "apiKey": "default-api-key"
     },
     "REDICA": {
-      "targetServer": "pgc.sytes.net",
-      "targetDb": "A_777",
-      "targetUser": "profit",
-      "targetPass": "FomvesPm+Ecdtm",
-      "cloneServer": "SRV-DEMO\\SQLEXPRESS",
-      "cloneDb": "A_777",
+      "targetServer": "207.180.241.96\\SQLEXPRESS",
+      "targetPort": 14330,
+      "targetDb": "DEMOA",
+      "targetUser": "ProfitConex",
+      "targetPass": "vN94]2.i[?N]",
+      "cloneServer": "207.244.239.40\\SQLEXPRESS",
+      "clonePort": 1433,
+      "cloneDb": "DEMOA",
       "cloneUser": "profit",
-      "clonePass": "profit",
+      "clonePass": "FomvesPm+Ecdtm",
       "tables": [
         {
           "table": "saMoneda",

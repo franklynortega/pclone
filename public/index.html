@@ -67,19 +67,23 @@
                     <!-- Conexión Target -->
                     <h4>Base de Datos Origen (Target)</h4>
                     <div class="row">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label for="target-server" class="form-label">Servidor:</label>
                             <input type="text" id="target-server" class="form-control" required>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-2 mb-3">
+                            <label for="target-port" class="form-label">Puerto:</label>
+                            <input type="number" id="target-port" class="form-control" value="1433" min="1" max="65535" required>
+                        </div>
+                        <div class="col-md-3 mb-3">
                             <label for="target-db" class="form-label">Base de Datos:</label>
                             <input type="text" id="target-db" class="form-control" required>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-3 mb-3">
                             <label for="target-user" class="form-label">Usuario:</label>
                             <input type="text" id="target-user" class="form-control" required>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-3 mb-3">
                             <label for="target-pass" class="form-label">Contraseña:</label>
                             <input type="password" id="target-pass" class="form-control" required>
                         </div>
@@ -88,19 +92,23 @@
                     <!-- Conexión Clone -->
                     <h4>Base de Datos Destino (Clone)</h4>
                     <div class="row">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label for="clone-server" class="form-label">Servidor:</label>
                             <input type="text" id="clone-server" class="form-control" required>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-2 mb-3">
+                            <label for="clone-port" class="form-label">Puerto:</label>
+                            <input type="number" id="clone-port" class="form-control" value="1433" min="1" max="65535" required>
+                        </div>
+                        <div class="col-md-3 mb-3">
                             <label for="clone-db" class="form-label">Base de Datos:</label>
                             <input type="text" id="clone-db" class="form-control" required>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-3 mb-3">
                             <label for="clone-user" class="form-label">Usuario:</label>
                             <input type="text" id="clone-user" class="form-control" required>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-3 mb-3">
                             <label for="clone-pass" class="form-label">Contraseña:</label>
                             <input type="password" id="clone-pass" class="form-control" required>
                         </div>

@@ -7,6 +7,7 @@ import fs from 'fs';
 import crypto from 'crypto';
 import cron from 'node-cron';
 import sql from 'mssql';
+import { getConfig } from './config.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -38,10 +39,12 @@ const validatePayload = (payload) => {
   const errors = [];
 
   if (!payload.targetServer) errors.push('targetServer es requerido');
+  if (!payload.targetPort || payload.targetPort < 1 || payload.targetPort > 65535) errors.push('targetPort debe ser un número válido entre 1 y 65535');
   if (!payload.targetDb) errors.push('targetDb es requerido');
   if (!payload.targetUser) errors.push('targetUser es requerido');
   if (!payload.targetPass) errors.push('targetPass es requerido');
   if (!payload.cloneServer) errors.push('cloneServer es requerido');
+  if (!payload.clonePort || payload.clonePort < 1 || payload.clonePort > 65535) errors.push('clonePort debe ser un número válido entre 1 y 65535');
   if (!payload.cloneDb) errors.push('cloneDb es requerido');
   if (!payload.cloneUser) errors.push('cloneUser es requerido');
   if (!payload.clonePass) errors.push('clonePass es requerido');
@@ -171,55 +174,55 @@ app.post('/auth/login', (req, res) => {
 
 // Endpoint GET /presets
 app.get('/presets', (req, res) => {
-   const username = req.headers['x-username'] || 'admin';
-   const presets = loadPresets();
-   const userPresets = presets[username] || {};
-   res.json({ presets: Object.keys(userPresets) });
+  const username = req.headers['x-username'] || 'admin';
+  const presets = loadPresets();
+  const userPresets = presets[username] || {};
+  res.json({ presets: Object.keys(userPresets) });
 });
 
 // Endpoint POST /presets
 app.post('/presets', (req, res) => {
-   const username = req.headers['x-username'] || 'admin';
-   const { name, config } = req.body;
-   if (!name || !config) {
-      return res.status(400).json({ error: 'Nombre y configuración requeridos' });
-   }
+  const username = req.headers['x-username'] || 'admin';
+  const { name, config } = req.body;
+  if (!name || !config) {
+    return res.status(400).json({ error: 'Nombre y configuración requeridos' });
+  }
 
-   const presets = loadPresets();
-   if (!presets[username]) presets[username] = {};
-   presets[username][name] = config;
-   savePresets(presets);
+  const presets = loadPresets();
+  if (!presets[username]) presets[username] = {};
+  presets[username][name] = config;
+  savePresets(presets);
 
-   res.json({ success: true });
+  res.json({ success: true });
 });
 
 // Endpoint GET /presets/:name
 app.get('/presets/:name', (req, res) => {
-   const username = req.headers['x-username'] || 'admin';
-   const name = req.params.name;
-   const presets = loadPresets();
-   const userPresets = presets[username] || {};
-   const config = userPresets[name];
+  const username = req.headers['x-username'] || 'admin';
+  const name = req.params.name;
+  const presets = loadPresets();
+  const userPresets = presets[username] || {};
+  const config = userPresets[name];
 
-   if (!config) {
-      return res.status(404).json({ error: 'Preset no encontrado' });
-   }
+  if (!config) {
+    return res.status(404).json({ error: 'Preset no encontrado' });
+  }
 
-   res.json({ config });
+  res.json({ config });
 });
 
 // Endpoint DELETE /presets/:name
 app.delete('/presets/:name', (req, res) => {
-   const username = req.headers['x-username'] || 'admin';
-   const name = req.params.name;
-   const presets = loadPresets();
-   if (presets[username] && presets[username][name]) {
-      delete presets[username][name];
-      savePresets(presets);
-      res.json({ success: true });
-   } else {
-      res.status(404).json({ error: 'Preset no encontrado' });
-   }
+  const username = req.headers['x-username'] || 'admin';
+  const name = req.params.name;
+  const presets = loadPresets();
+  if (presets[username] && presets[username][name]) {
+    delete presets[username][name];
+    savePresets(presets);
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ error: 'Preset no encontrado' });
+  }
 });
 
 // Endpoint GET /tables - devuelve las tablas por defecto
@@ -364,7 +367,7 @@ app.get('/logs', authenticate, (req, res) => {
 // Endpoint POST /api/test-connection
 app.post('/api/test-connection', authenticate, async (req, res) => {
   try {
-    const { targetServer, targetDb, targetUser, targetPass, cloneServer, cloneDb, cloneUser, clonePass } = req.body;
+    const { targetServer, targetPort = 1433, targetDb, targetUser, targetPass, cloneServer, clonePort = 1433, cloneDb, cloneUser, clonePass } = req.body;
 
     const results = {
       target: { success: false, error: null },
@@ -373,18 +376,14 @@ app.post('/api/test-connection', authenticate, async (req, res) => {
 
     // Test Target connection
     try {
-      const targetConfig = {
-        server: targetServer,
-        database: targetDb,
-        user: targetUser,
-        password: targetPass,
-        options: {
-          encrypt: false,
-          trustServerCertificate: true,
-          connectionTimeout: 5000,
-          requestTimeout: 5000
-        }
-      };
+      const { targetConfig } = getConfig({
+        targetServer, targetPort, targetDb, targetUser, targetPass,
+        cloneServer, clonePort, cloneDb, cloneUser, clonePass
+      });
+
+      // Add timeouts for testing
+      targetConfig.options.connectionTimeout = 5000;
+      targetConfig.options.requestTimeout = 5000;
 
       const targetPool = new sql.ConnectionPool(targetConfig);
       await targetPool.connect();
@@ -396,18 +395,13 @@ app.post('/api/test-connection', authenticate, async (req, res) => {
 
     // Test Clone connection
     try {
-      const cloneConfig = {
-        server: cloneServer,
-        database: cloneDb,
-        user: cloneUser,
-        password: clonePass,
-        options: {
-          encrypt: false,
-          trustServerCertificate: true,
-          connectionTimeout: 5000,
-          requestTimeout: 5000
-        }
-      };
+      const { cloneConfig } = getConfig({
+        targetServer, targetPort, targetDb, targetUser, targetPass,
+        cloneServer, clonePort, cloneDb, cloneUser, clonePass
+      });
+
+      cloneConfig.options.connectionTimeout = 5000;
+      cloneConfig.options.requestTimeout = 5000;
 
       const clonePool = new sql.ConnectionPool(cloneConfig);
       await clonePool.connect();
@@ -436,20 +430,24 @@ async function processSyncTask(taskId) {
     // Configurar variables de entorno temporales
     const originalEnv = {
       TARGET_SERVER: process.env.TARGET_SERVER,
+      TARGET_PORT: process.env.TARGET_PORT,
       TARGET_DB: process.env.TARGET_DB,
       TARGET_USER: process.env.TARGET_USER,
       TARGET_PASS: process.env.TARGET_PASS,
       CLONE_SERVER: process.env.CLONE_SERVER,
+      CLONE_PORT: process.env.CLONE_PORT,
       CLONE_DB: process.env.CLONE_DB,
       CLONE_USER: process.env.CLONE_USER,
       CLONE_PASS: process.env.CLONE_PASS
     };
 
     process.env.TARGET_SERVER = task.payload.targetServer;
+    process.env.TARGET_PORT = task.payload.targetPort?.toString() || '1433';
     process.env.TARGET_DB = task.payload.targetDb;
     process.env.TARGET_USER = task.payload.targetUser;
     process.env.TARGET_PASS = task.payload.targetPass;
     process.env.CLONE_SERVER = task.payload.cloneServer;
+    process.env.CLONE_PORT = task.payload.clonePort?.toString() || '1433';
     process.env.CLONE_DB = task.payload.cloneDb;
     process.env.CLONE_USER = task.payload.cloneUser;
     process.env.CLONE_PASS = task.payload.clonePass;
@@ -502,10 +500,12 @@ async function processSyncTask(taskId) {
 
     // Restaurar variables de entorno
     process.env.TARGET_SERVER = originalEnv.TARGET_SERVER;
+    process.env.TARGET_PORT = originalEnv.TARGET_PORT;
     process.env.TARGET_DB = originalEnv.TARGET_DB;
     process.env.TARGET_USER = originalEnv.TARGET_USER;
     process.env.TARGET_PASS = originalEnv.TARGET_PASS;
     process.env.CLONE_SERVER = originalEnv.CLONE_SERVER;
+    process.env.CLONE_PORT = originalEnv.CLONE_PORT;
     process.env.CLONE_DB = originalEnv.CLONE_DB;
     process.env.CLONE_USER = originalEnv.CLONE_USER;
     process.env.CLONE_PASS = originalEnv.CLONE_PASS;

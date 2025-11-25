@@ -178,10 +178,12 @@ async function savePreset() {
 function getConfig() {
     const config = {
         targetServer: document.getElementById('target-server').value.trim(),
+        targetPort: parseInt(document.getElementById('target-port').value) || 1433,
         targetDb: document.getElementById('target-db').value.trim(),
         targetUser: document.getElementById('target-user').value.trim(),
         targetPass: document.getElementById('target-pass').value.trim(),
         cloneServer: document.getElementById('clone-server').value.trim(),
+        clonePort: parseInt(document.getElementById('clone-port').value) || 1433,
         cloneDb: document.getElementById('clone-db').value.trim(),
         cloneUser: document.getElementById('clone-user').value.trim(),
         clonePass: document.getElementById('clone-pass').value.trim(),
@@ -230,10 +232,12 @@ function getConfig() {
 
 function loadConfig(config) {
     document.getElementById('target-server').value = config.targetServer || '';
+    document.getElementById('target-port').value = config.targetPort || 1433;
     document.getElementById('target-db').value = config.targetDb || '';
     document.getElementById('target-user').value = config.targetUser || '';
     document.getElementById('target-pass').value = config.targetPass || '';
     document.getElementById('clone-server').value = config.cloneServer || '';
+    document.getElementById('clone-port').value = config.clonePort || 1433;
     document.getElementById('clone-db').value = config.cloneDb || '';
     document.getElementById('clone-user').value = config.cloneUser || '';
     document.getElementById('clone-pass').value = config.clonePass || '';
@@ -308,10 +312,12 @@ async function testConnection() {
             },
             body: JSON.stringify({
                 targetServer: config.targetServer,
+                targetPort: config.targetPort,
                 targetDb: config.targetDb,
                 targetUser: config.targetUser,
                 targetPass: config.targetPass,
                 cloneServer: config.cloneServer,
+                clonePort: config.clonePort,
                 cloneDb: config.cloneDb,
                 cloneUser: config.cloneUser,
                 clonePass: config.clonePass
@@ -363,10 +369,12 @@ async function executeTask() {
             },
             body: JSON.stringify({
                 targetServer: config.targetServer,
+                targetPort: config.targetPort,
                 targetDb: config.targetDb,
                 targetUser: config.targetUser,
                 targetPass: config.targetPass,
                 cloneServer: config.cloneServer,
+                clonePort: config.clonePort,
                 cloneDb: config.cloneDb,
                 cloneUser: config.cloneUser,
                 clonePass: config.clonePass,
@@ -588,10 +596,12 @@ async function executePreset(presetName) {
                 },
                 body: JSON.stringify({
                     targetServer: config.targetServer,
+                    targetPort: config.targetPort,
                     targetDb: config.targetDb,
                     targetUser: config.targetUser,
                     targetPass: config.targetPass,
                     cloneServer: config.cloneServer,
+                    clonePort: config.clonePort,
                     cloneDb: config.cloneDb,
                     cloneUser: config.cloneUser,
                     clonePass: config.clonePass,
@@ -691,10 +701,12 @@ async function executePresetSequentiallyInline(presetName) {
                     },
                     body: JSON.stringify({
                         targetServer: config.targetServer,
+                        targetPort: config.targetPort,
                         targetDb: config.targetDb,
                         targetUser: config.targetUser,
                         targetPass: config.targetPass,
                         cloneServer: config.cloneServer,
+                        clonePort: config.clonePort,
                         cloneDb: config.cloneDb,
                         cloneUser: config.cloneUser,
                         clonePass: config.clonePass,

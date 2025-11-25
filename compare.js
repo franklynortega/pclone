@@ -1,5 +1,5 @@
 import sql from 'mssql';
-import { targetConfig, cloneConfig } from './config.js';
+import { getConfig } from './config.js';
 import logger from './logger.js';
 import retry from 'async-retry';
 
@@ -34,7 +34,7 @@ async function getChecksum(pool, tableName, pkColumns) {
       }
 
       const orderBy = pkColumns.map(pk => `[${pk}]`).join(', ');
-      const query = `WITH ordered AS (SELECT TOP 100 PERCENT ${checksumColumns.join(', ')} FROM ${tableName} ORDER BY ${orderBy}) SELECT CHECKSUM_AGG(CHECKSUM(${checksumColumns.map((col, i) => `col${i+1}`).join(', ')})) AS checksum FROM ordered`;
+      const query = `WITH ordered AS (SELECT TOP 100 PERCENT ${checksumColumns.join(', ')} FROM ${tableName} ORDER BY ${orderBy}) SELECT CHECKSUM_AGG(CHECKSUM(${checksumColumns.map((col, i) => `col${i + 1}`).join(', ')})) AS checksum FROM ordered`;
       logger.debug(`Query checksum para ${tableName}: ${query}`);
       const result = await pool.request().query(query);
       return result.recordset[0].checksum;
@@ -46,15 +46,15 @@ async function getChecksum(pool, tableName, pkColumns) {
 }
 
 async function getChecksumWithColumns(pool, tableName, pkColumns, columns, minLengths) {
-   return await retry(async (bail) => {
-     try {
-       const insertableColumns = columns.filter(col => !col.type.toLowerCase().includes('timestamp') && !col.isComputed);
-       let allColumns = insertableColumns.filter(col => !pkColumns.includes(col.name) && (col.type.toLowerCase().includes('char') || col.type.toLowerCase().includes('int') || col.type.toLowerCase().includes('decimal') || col.type.toLowerCase().includes('float') || col.type.toLowerCase().includes('bit') || col.type.toLowerCase().includes('money') || col.type.toLowerCase().includes('numeric') || col.type.toLowerCase().includes('smallint') || col.type.toLowerCase().includes('tinyint') || col.type.toLowerCase().includes('bigint') || col.type.toLowerCase().includes('real')) && !col.type.toLowerCase().includes('xml') && col.name.toLowerCase() !== 'validador' && col.name.toLowerCase() !== 'co_alma_calculado' && col.name.toLowerCase() !== 'fe_us_in' && col.name.toLowerCase() !== 'fe_us_mo' && col.name.toLowerCase() !== 'fecha_reg' && !col.type.toLowerCase().includes('uniqueidentifier') && !col.type.toLowerCase().includes('binary') && !col.type.toLowerCase().includes('image') && !col.type.toLowerCase().includes('text') && !col.type.toLowerCase().includes('datetime') && !col.type.toLowerCase().includes('smalldatetime'));
+  return await retry(async (bail) => {
+    try {
+      const insertableColumns = columns.filter(col => !col.type.toLowerCase().includes('timestamp') && !col.isComputed);
+      let allColumns = insertableColumns.filter(col => !pkColumns.includes(col.name) && (col.type.toLowerCase().includes('char') || col.type.toLowerCase().includes('int') || col.type.toLowerCase().includes('decimal') || col.type.toLowerCase().includes('float') || col.type.toLowerCase().includes('bit') || col.type.toLowerCase().includes('money') || col.type.toLowerCase().includes('numeric') || col.type.toLowerCase().includes('smallint') || col.type.toLowerCase().includes('tinyint') || col.type.toLowerCase().includes('bigint') || col.type.toLowerCase().includes('real')) && !col.type.toLowerCase().includes('xml') && col.name.toLowerCase() !== 'validador' && col.name.toLowerCase() !== 'co_alma_calculado' && col.name.toLowerCase() !== 'fe_us_in' && col.name.toLowerCase() !== 'fe_us_mo' && col.name.toLowerCase() !== 'fecha_reg' && !col.type.toLowerCase().includes('uniqueidentifier') && !col.type.toLowerCase().includes('binary') && !col.type.toLowerCase().includes('image') && !col.type.toLowerCase().includes('text') && !col.type.toLowerCase().includes('datetime') && !col.type.toLowerCase().includes('smalldatetime'));
 
-       // Excluir rowguid ya que es único por fila y causa checksums diferentes
-       allColumns = allColumns.filter(col => col.name !== 'rowguid');
+      // Excluir rowguid ya que es único por fila y causa checksums diferentes
+      allColumns = allColumns.filter(col => col.name !== 'rowguid');
 
-       const checksumColumns = allColumns.filter(col => !col.type.toLowerCase().includes('xml') && col.name.toLowerCase() !== 'validador' && col.name.toLowerCase() !== 'fe_us_in' && col.name.toLowerCase() !== 'fe_us_mo' && col.name.toLowerCase() !== 'co_us_in' && col.name.toLowerCase() !== 'co_sucu_in' && col.name.toLowerCase() !== 'co_us_mo' && col.name.toLowerCase() !== 'co_sucu_mo' && col.name !== 'co_mone' && col.name !== 'revisado' && col.name !== 'trasnfe' && !col.type.toLowerCase().includes('uniqueidentifier') && !col.type.toLowerCase().includes('binary') && !col.type.toLowerCase().includes('datetime') && !col.type.toLowerCase().includes('smalldatetime') && !col.type.toLowerCase().includes('bit')).map((col, i) => {
+      const checksumColumns = allColumns.filter(col => !col.type.toLowerCase().includes('xml') && col.name.toLowerCase() !== 'validador' && col.name.toLowerCase() !== 'fe_us_in' && col.name.toLowerCase() !== 'fe_us_mo' && col.name.toLowerCase() !== 'co_us_in' && col.name.toLowerCase() !== 'co_sucu_in' && col.name.toLowerCase() !== 'co_us_mo' && col.name.toLowerCase() !== 'co_sucu_mo' && col.name !== 'co_mone' && col.name !== 'revisado' && col.name !== 'trasnfe' && !col.type.toLowerCase().includes('uniqueidentifier') && !col.type.toLowerCase().includes('binary') && !col.type.toLowerCase().includes('datetime') && !col.type.toLowerCase().includes('smalldatetime') && !col.type.toLowerCase().includes('bit')).map((col, i) => {
         const colName = `[${col.name}]`;
         let expr;
         if (col.type.toLowerCase().includes('char') || col.type.toLowerCase().includes('varchar') || col.type.toLowerCase().includes('nvarchar')) {
@@ -83,7 +83,7 @@ async function getChecksumWithColumns(pool, tableName, pkColumns, columns, minLe
       }
 
       const orderBy = pkColumns.map(pk => `[${pk}]`).join(', ');
-      const query = `WITH ordered AS (SELECT TOP 100 PERCENT ${checksumColumns.join(', ')} FROM ${tableName} ORDER BY ${orderBy}) SELECT CHECKSUM_AGG(CHECKSUM(${checksumColumns.map((col, i) => `col${i+1}`).join(', ')})) AS checksum FROM ordered`;
+      const query = `WITH ordered AS (SELECT TOP 100 PERCENT ${checksumColumns.join(', ')} FROM ${tableName} ORDER BY ${orderBy}) SELECT CHECKSUM_AGG(CHECKSUM(${checksumColumns.map((col, i) => `col${i + 1}`).join(', ')})) AS checksum FROM ordered`;
       logger.debug(`Query checksum para ${tableName}: ${query}`);
       const result = await pool.request().query(query);
       return result.recordset[0].checksum;
