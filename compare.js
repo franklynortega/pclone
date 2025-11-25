@@ -146,16 +146,170 @@ function formatValueForParam(val, type) {
   if (type && type.toLowerCase().includes('varchar')) return sql.NText;
   if (type && type.toLowerCase().includes('nvarchar')) return sql.NText;
   if (type && type.toLowerCase().includes('datetime')) return sql.DateTime;
-  return sql.NVarChar;
+  if (type && type.toLowerCase().includes('bit')) return sql.Bit;
+  if (type && (type.toLowerCase().includes('binary') || type.toLowerCase().includes('image'))) return sql.VarBinary(sql.MAX);
+  // Default
+  return sql.NText;
 }
 
-async function compareTable(tableName, pkColumns, sync) {
+async function syncTable(tableName, pkColumns) {
   let targetPool, clonePool;
   try {
     const { targetConfig, cloneConfig } = getConfig();
     targetPool = await new sql.ConnectionPool(targetConfig).connect();
     clonePool = await new sql.ConnectionPool(cloneConfig).connect();
 
+    const columns = await getColumns(clonePool, tableName);
+    const targetColumns = await getColumns(targetPool, tableName);
+    if (columns.length === 0) throw new Error('Tabla no encontrada en target');
+
+    const columnNames = columns.map(col => col.name);
+    for (const pk of pkColumns) {
+      if (!columnNames.includes(pk)) throw new Error(`Columna ${pk} no encontrada`);
+    }
+
+    // Filtrar pkColumns para excluir columnas computadas
+    pkColumns = pkColumns.filter(pk => {
+      const col = columns.find(c => c.name === pk);
+      return col && !col.isComputed;
+    });
+    // Excluir columnas computadas conocidas que no se detectaron
+    if (tableName === 'saArtPrecio') {
+      pkColumns = pkColumns.filter(pk => pk !== 'co_alma_calculado');
+    }
+
+    // Filtrar columnas que no se pueden insertar (timestamp, computed, etc.)
+    let insertableColumns = columns.filter(col => !col.type.toLowerCase().includes('timestamp') && !col.isComputed && col.name !== 'rowguid');
+    // Excluir columnas computadas conocidas que no se detectaron
+    if (tableName === 'saArtPrecio') {
+      insertableColumns = insertableColumns.filter(col => col.name !== 'co_alma_calculado');
+    }
+    const insertableColumnNames = insertableColumns.map(col => col.name);
+
+    // Leer datos de target
+    const selectQuery = `SELECT ${insertableColumnNames.join(', ')} FROM ${tableName}`;
+    const targetResult = await retry(async () => await targetPool.request().query(selectQuery), { retries: 3, minTimeout: 1000, maxTimeout: 5000 });
+    const rows = targetResult.recordset;
+
+    if (rows.length === 0) {
+      return;
+    }
+
+    // Crear tabla temporal global en clone con datos de target
+    const tempTableName = `##temp_${tableName}_${Date.now()}`;
+    const createTempQuery = `CREATE TABLE ${tempTableName} (${insertableColumns.map(col => {
+      let type = col.type;
+      if (col.type === 'char' || col.type === 'varchar' || col.type === 'nvarchar') {
+        type = 'nvarchar(max)';
+      } else if (col.type === 'decimal' || col.type === 'numeric') {
+        if (col.precision && col.scale !== undefined) {
+          type += `(${col.precision}, ${col.scale})`;
+        } else {
+          type += '(18, 2)'; // default
+        }
+      } else {
+        if (col.maxLength && col.maxLength > 0) {
+          type += `(${col.maxLength})`;
+        }
+      }
+      return `[${col.name}] ${type}`;
+    }).join(', ')})`;
+    try {
+      await clonePool.request().query(createTempQuery);
+    } catch (error) {
+      throw error;
+    }
+
+    // Insertar datos en temp table fila por fila
+    for (const row of rows) {
+      const values = insertableColumnNames.map(colName => {
+        const col = insertableColumns.find(c => c.name === colName);
+        const targetCol = targetColumns.find(tc => tc.name === colName);
+        const targetLen = (targetCol && targetCol.maxLength && targetCol.maxLength > 0) ? targetCol.maxLength : 1000;
+        const cloneLen = (col.maxLength && col.maxLength > 0) ? col.maxLength : 1000;
+        const tempLen = Math.max(targetLen, cloneLen);
+        const val = row[colName];
+        return formatValue(val, col.type, tempLen);
+      }).join(', ');
+
+      const insertTempQuery = `INSERT INTO ${tempTableName} (${insertableColumnNames.join(', ')}) VALUES (${values})`;
+
+      await retry(async () => {
+        await clonePool.request().query(insertTempQuery);
+      }, { retries: 3, minTimeout: 1000, maxTimeout: 5000 });
+    }
+
+    // Para saArtPrecio, usar DELETE/INSERT directo sin temp table
+    if (tableName === 'saArtPrecio') {
+      // DELETE all from clone
+      await clonePool.request().query(`DELETE FROM ${tableName}`);
+
+      // INSERT rows one by one
+      for (const row of rows) {
+        const values = insertableColumnNames.map(colName => {
+          const col = insertableColumns.find(c => c.name === colName);
+          const targetCol = targetColumns.find(tc => tc.name === colName);
+          const targetLen = (targetCol && targetCol.maxLength && targetCol.maxLength > 0) ? targetCol.maxLength : 1000;
+          const cloneLen = (col.maxLength && col.maxLength > 0) ? col.maxLength : 1000;
+          const tempLen = Math.max(targetLen, cloneLen);
+          const val = row[colName];
+          return formatValue(val, col.type, tempLen);
+        }).join(', ');
+
+        const insertQuery = `INSERT INTO ${tableName} (${insertableColumnNames.join(', ')}) VALUES (${values})`;
+
+        await retry(async () => {
+          await clonePool.request().query(insertQuery);
+        }, { retries: 3, minTimeout: 1000, maxTimeout: 5000 });
+      }
+
+      logger.info(`DELETE/INSERT afectó ${rows.length} filas`);
+    } else {
+      // MERGE from temp to handle updates and inserts without deleting
+      const mergeCols = insertableColumns.map(col => `[${col.name}]`).join(', ');
+      const mergeVals = insertableColumns.map(col => `source.[${col.name}]`).join(', ');
+      const pkCondition = pkColumns.map(pk => `target.[${pk}] = source.[${pk}]`).join(' AND ');
+      const updateSet = insertableColumns.filter(col => !pkColumns.includes(col.name)).map(col => `target.[${col.name}] = source.[${col.name}]`).join(', ');
+
+      const mergeQuery = `
+        MERGE ${tableName} AS target
+        USING ${tempTableName} AS source
+        ON ${pkCondition}
+        WHEN MATCHED THEN
+          UPDATE SET ${updateSet}
+        WHEN NOT MATCHED THEN
+          INSERT (${mergeCols})
+          VALUES (${mergeVals})
+        WHEN NOT MATCHED BY SOURCE THEN
+          DELETE;
+      `;
+
+      await retry(async () => {
+        const result = await clonePool.request().query(mergeQuery);
+        logger.info(`MERGE afectó ${result.rowsAffected} filas`);
+      }, { retries: 3, minTimeout: 1000, maxTimeout: 5000 });
+    }
+
+    // Drop temp table
+    await clonePool.request().query(`DROP TABLE ${tempTableName}`);
+
+    logger.info(`Sincronización completada para ${tableName}`);
+  } catch (error) {
+    logger.error('Error en sincronización:', error);
+  } finally {
+    if (targetPool) await targetPool.close();
+    if (clonePool) await clonePool.close();
+  }
+}
+
+async function compareTable(tableName, pkColumns, sync = false) {
+  let targetPool, clonePool;
+  try {
+    const { targetConfig, cloneConfig } = getConfig();
+    targetPool = await new sql.ConnectionPool(targetConfig).connect();
+    clonePool = await new sql.ConnectionPool(cloneConfig).connect();
+
+    // Get columns from both to find common non-computed columns
     const targetColumns = await getColumns(targetPool, tableName);
     const cloneColumns = await getColumns(clonePool, tableName);
     const commonColumns = targetColumns.filter(tc => cloneColumns.some(cc => cc.name === tc.name && !tc.isComputed && !cc.isComputed));
@@ -191,116 +345,24 @@ async function compareTable(tableName, pkColumns, sync) {
     } else {
       logger.warn(`Tabla ${tableName} presentó cambios (checksums diferentes).`);
       if (sync) {
-        await syncTable(targetPool, clonePool, tableName, originalPkColumns);
+        await syncTable(tableName, originalPkColumns);
+        // Recalcular checksums después de sincronización
+        const newTargetChecksum = await getChecksumWithColumns(targetPool, tableName, pkColumns, commonColumns, minLengths);
+        const newCloneChecksum = await getChecksumWithColumns(clonePool, tableName, pkColumns, commonColumns, minLengths);
+        if (newTargetChecksum === newCloneChecksum) {
+          logger.info(`Tabla ${tableName} sincronizada exitosamente.`);
+        } else {
+          logger.error(`Tabla ${tableName} aún no sincronizada después de la operación.`);
+        }
       }
       return false;
     }
   } catch (error) {
-    logger.error(`Error en comparación para tabla ${tableName}: ${error.message}`, { stack: error.stack });
+    logger.error('Error en comparación:', error);
     return false;
   } finally {
     if (targetPool) await targetPool.close();
     if (clonePool) await clonePool.close();
-  }
-}
-
-async function syncTable(targetPool, clonePool, tableName, pkColumns) {
-  logger.info(`Iniciando sincronización de tabla ${tableName}...`);
-  try {
-    // 1. Obtener columnas
-    let columns = await getColumns(targetPool, tableName);
-    // Filtrar columnas que no se pueden insertar (timestamp, computed)
-    columns = columns.filter(col => !col.type.toLowerCase().includes('timestamp') && !col.isComputed);
-
-    const columnNames = columns.map(c => `[${c.name}]`).join(', ');
-
-    // 2. Leer datos de Target
-    const request = targetPool.request();
-    request.stream = true;
-    request.query(`SELECT ${columnNames} FROM ${tableName}`);
-
-    const table = new sql.Table(`#Temp_${tableName.replace(/[^a-zA-Z0-9_]/g, '')}`);
-    table.create = true;
-
-    columns.forEach(col => {
-      let type;
-      if (col.type.toLowerCase().includes('int')) type = sql.Int;
-      else if (col.type.toLowerCase().includes('varchar')) type = sql.NVarChar(sql.MAX);
-      else if (col.type.toLowerCase().includes('datetime')) type = sql.DateTime;
-      else if (col.type.toLowerCase().includes('bit')) type = sql.Bit;
-      else if (col.type.toLowerCase().includes('decimal')) type = sql.Decimal(18, 5);
-      else type = sql.NVarChar(sql.MAX);
-
-      table.columns.add(col.name, type, { nullable: col.nullable });
-    });
-
-    const rows = [];
-
-    return new Promise((resolve, reject) => {
-      request.on('row', row => {
-        const values = [];
-        for (const col of columns) {
-          values.push(row[col.name]);
-        }
-        table.rows.add(...values);
-      });
-
-      request.on('error', err => {
-        reject(err);
-      });
-
-      request.on('done', async () => {
-        try {
-          // 3. Bulk Insert a tabla temporal en Clone
-          const cloneRequest = clonePool.request();
-
-          // Crear tabla temporal manualmente para asegurar tipos
-          const colDefs = columns.map(c => {
-            let typeDef = c.type;
-            if (c.maxLength && c.maxLength > 0 && (c.type.includes('char') || c.type.includes('binary'))) {
-              typeDef += `(${c.maxLength})`;
-            } else if (c.maxLength === -1 && (c.type.includes('char') || c.type.includes('binary'))) {
-              typeDef += '(MAX)';
-            }
-            if (c.precision && c.scale && (c.type.includes('decimal') || c.type.includes('numeric'))) {
-              typeDef += `(${c.precision},${c.scale})`;
-            }
-            return `[${c.name}] ${typeDef}`;
-          }).join(', ');
-
-          const tempTableName = `#Temp_${tableName.replace(/[^a-zA-Z0-9_]/g, '')}`;
-          // 4. MERGE
-          const pkMatch = pkColumns.map(pk => `T.[${pk}] = S.[${pk}]`).join(' AND ');
-          const updateSet = columns.filter(c => !pkColumns.includes(c.name) && !c.isComputed).map(c => `T.[${c.name}] = S.[${c.name}]`).join(', ');
-          const insertCols = columns.filter(c => !c.isComputed).map(c => `[${c.name}]`).join(', ');
-          const insertVals = columns.filter(c => !c.isComputed).map(c => `S.[${c.name}]`).join(', ');
-
-          const mergeQuery = `
-            MERGE ${tableName} AS T
-            USING ${tempTableName} AS S
-            ON (${pkMatch})
-            WHEN MATCHED THEN
-              UPDATE SET ${updateSet}
-            WHEN NOT MATCHED BY TARGET THEN
-              INSERT (${insertCols}) VALUES (${insertVals})
-            WHEN NOT MATCHED BY SOURCE THEN
-              DELETE;
-            DROP TABLE ${tempTableName};
-          `;
-
-          await cloneRequest.query(mergeQuery);
-          logger.info(`Sincronización de tabla ${tableName} completada exitosamente.`);
-          resolve(true);
-
-        } catch (err) {
-          reject(err);
-        }
-      });
-    });
-
-  } catch (error) {
-    logger.error(`Error sincronizando tabla ${tableName}: ${error.message}`, error);
-    throw error;
   }
 }
 
