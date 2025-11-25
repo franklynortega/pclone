@@ -313,6 +313,18 @@ app.delete('/schedule/:id', authenticate, (req, res) => {
     job.cron.stop();
     userJobs.delete(jobId);
     res.json({ message: 'Trabajo detenido' });
+  } else {
+    res.status(404).json({ error: 'Trabajo no encontrado' });
+  }
+});
+
+// Endpoint POST /api/test-connection
+app.post('/api/test-connection', authenticate, async (req, res) => {
+  try {
+    const {
+      targetServer, targetPort, targetDb, targetUser, targetPass,
+      cloneServer, clonePort, cloneDb, cloneUser, clonePass
+    } = req.body;
 
     const results = {
       target: { success: false, error: null },
@@ -360,6 +372,62 @@ app.delete('/schedule/:id', authenticate, (req, res) => {
   } catch (error) {
     logger.error('Error en POST /api/test-connection:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Endpoint GET /logs
+app.get('/logs', authenticate, (req, res) => {
+  try {
+    const { level, startDate, endDate, search, limit = 100 } = req.query;
+    const logPath = 'logs/sync.log';
+
+    if (!fs.existsSync(logPath)) {
+      return res.json({ logs: [], total: 0 });
+    }
+
+    const logContent = fs.readFileSync(logPath, 'utf8');
+    const logLines = logContent.trim().split('\n').filter(line => line.trim());
+
+    let logs = logLines.map(line => {
+      try {
+        return JSON.parse(line);
+      } catch (e) {
+        return null;
+      }
+    }).filter(log => log !== null);
+
+    // Filter by level
+    if (level) {
+      logs = logs.filter(log => log.level === level);
+    }
+
+    // Filter by date
+    if (startDate) {
+      logs = logs.filter(log => new Date(log.timestamp) >= new Date(startDate));
+    }
+    if (endDate) {
+      logs = logs.filter(log => new Date(log.timestamp) <= new Date(endDate));
+    }
+
+    // Filter by search text
+    if (search) {
+      const searchLower = search.toLowerCase();
+      logs = logs.filter(log =>
+        log.message.toLowerCase().includes(searchLower) ||
+        (log.level && log.level.toLowerCase().includes(searchLower))
+      );
+    }
+
+    // Sort by timestamp desc
+    logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    const total = logs.length;
+    const limitedLogs = logs.slice(0, parseInt(limit));
+
+    res.json({ logs: limitedLogs, total });
+  } catch (error) {
+    logger.error('Error obteniendo logs:', error);
+    res.status(500).json({ error: 'Error obteniendo logs' });
   }
 });
 
