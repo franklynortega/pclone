@@ -319,6 +319,9 @@ app.get('/logs', authenticate, (req, res) => {
     const { level, startDate, endDate, search, limit = 100 } = req.query;
 
     // Leer archivo de logs
+    if (!fs.existsSync('sync.log')) {
+      return res.json({ logs: [], total: 0 });
+    }
     const logContent = fs.readFileSync('sync.log', 'utf8');
     const logLines = logContent.trim().split('\n').filter(line => line.trim());
 

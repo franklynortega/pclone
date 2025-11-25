@@ -8,51 +8,39 @@ const getConfig = (overrides = {}) => {
     return defaultVal;
   };
 
-  const targetServer = getVal('targetServer', 'TARGET_SERVER', 'localhost');
+  let targetServer = getVal('targetServer', 'TARGET_SERVER', 'localhost');
   const targetPort = parseInt(getVal('targetPort', 'TARGET_PORT', 1433));
   const targetDb = getVal('targetDb', 'TARGET_DB', 'targetDB');
   const targetUser = getVal('targetUser', 'TARGET_USER', 'readonlyuser');
   const targetPass = getVal('targetPass', 'TARGET_PASS', 'password');
 
-  const targetConfig = targetServer.includes('\\') ? {
+  // Remove instance name from server if present (e.g., "server\SQLEXPRESS" -> "server")
+  targetServer = targetServer.split('\\')[0];
+
+  const targetConfig = {
     server: targetServer,
     port: targetPort,
     database: targetDb,
     user: targetUser,
     password: targetPass,
     options: {
-      encrypt: false, // Cambia a true si usas SSL
-      trustServerCertificate: true
-    }
-  } : {
-    server: `${targetServer},${targetPort}`,
-    database: targetDb,
-    user: targetUser,
-    password: targetPass,
-    options: {
-      encrypt: false, // Cambia a true si usas SSL
+      encrypt: false,
       trustServerCertificate: true
     }
   };
 
-  const cloneServer = getVal('cloneServer', 'CLONE_SERVER', 'localhost');
+  let cloneServer = getVal('cloneServer', 'CLONE_SERVER', 'localhost');
   const clonePort = parseInt(getVal('clonePort', 'CLONE_PORT', 1433));
   const cloneDb = getVal('cloneDb', 'CLONE_DB', 'cloneDB');
   const cloneUser = getVal('cloneUser', 'CLONE_USER', 'adminuser');
   const clonePass = getVal('clonePass', 'CLONE_PASS', 'password');
 
-  const cloneConfig = cloneServer.includes('\\') ? {
+  // Remove instance name from server if present
+  cloneServer = cloneServer.split('\\')[0];
+
+  const cloneConfig = {
     server: cloneServer,
     port: clonePort,
-    database: cloneDb,
-    user: cloneUser,
-    password: clonePass,
-    options: {
-      encrypt: false,
-      trustServerCertificate: true
-    }
-  } : {
-    server: `${cloneServer},${clonePort}`,
     database: cloneDb,
     user: cloneUser,
     password: clonePass,
