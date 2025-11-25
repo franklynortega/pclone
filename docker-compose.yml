@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: pclone-app
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./sync.log:/usr/src/app/sync.log
+      - ./presets.json:/usr/src/app/presets.json
+      - ./users.txt:/usr/src/app/users.txt
+      - ./tables.json:/usr/src/app/tables.json
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
