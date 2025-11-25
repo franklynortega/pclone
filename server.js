@@ -13,6 +13,11 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.API_KEY || 'default-api-key';
 
+// Asegurar que el directorio de logs exista
+if (!fs.existsSync('logs')) {
+  fs.mkdirSync('logs');
+}
+
 // Middleware para parsear JSON
 app.use(express.json());
 
@@ -308,69 +313,6 @@ app.delete('/schedule/:id', authenticate, (req, res) => {
     job.cron.stop();
     userJobs.delete(jobId);
     res.json({ message: 'Trabajo detenido' });
-  } else {
-    res.status(404).json({ error: 'Trabajo no encontrado' });
-  }
-});
-
-// Endpoint GET /logs
-app.get('/logs', authenticate, (req, res) => {
-  try {
-    const { level, startDate, endDate, search, limit = 100 } = req.query;
-
-    // Leer archivo de logs
-    if (!fs.existsSync('sync.log')) {
-      return res.json({ logs: [], total: 0 });
-    }
-    const logContent = fs.readFileSync('sync.log', 'utf8');
-    const logLines = logContent.trim().split('\n').filter(line => line.trim());
-
-    let logs = logLines.map(line => {
-      try {
-        return JSON.parse(line);
-      } catch (e) {
-        return null;
-      }
-    }).filter(log => log !== null);
-
-    // Aplicar filtros
-    if (level) {
-      logs = logs.filter(log => log.level === level);
-    }
-
-    if (startDate) {
-      const start = new Date(startDate);
-      logs = logs.filter(log => new Date(log.timestamp) >= start);
-    }
-
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999); // Fin del día
-      logs = logs.filter(log => new Date(log.timestamp) <= end);
-    }
-
-    if (search) {
-      const searchLower = search.toLowerCase();
-      logs = logs.filter(log => log.message.toLowerCase().includes(searchLower));
-    }
-
-    // Ordenar por timestamp descendente (más recientes primero)
-    logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-    // Limitar resultados
-    const limitedLogs = logs.slice(0, parseInt(limit));
-
-    res.json({ logs: limitedLogs, total: logs.length });
-  } catch (error) {
-    logger.error('Error obteniendo logs:', error);
-    res.status(500).json({ error: 'Error obteniendo logs' });
-  }
-});
-
-// Endpoint POST /api/test-connection
-app.post('/api/test-connection', authenticate, async (req, res) => {
-  try {
-    const { targetServer, targetPort = 1433, targetDb, targetUser, targetPass, cloneServer, clonePort = 1433, cloneDb, cloneUser, clonePass } = req.body;
 
     const results = {
       target: { success: false, error: null },

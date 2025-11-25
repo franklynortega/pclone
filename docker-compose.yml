@@ -8,7 +8,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./sync.log:/usr/src/app/sync.log
+      - ./logs:/usr/src/app/logs
       - ./presets.json:/usr/src/app/presets.json
       - ./users.txt:/usr/src/app/users.txt
       - ./tables.json:/usr/src/app/tables.json

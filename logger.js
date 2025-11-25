@@ -15,7 +15,7 @@ const logger = winston.createLogger({
         winston.format.simple()
       )
     }),
-    new winston.transports.File({ filename: 'sync.log' })
+    new winston.transports.File({ filename: 'logs/sync.log' })
   ]
 });
 

@@ -937,7 +937,7 @@ async function schedulePreset() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'x-api-key': 'default-api-key',
+                'x-api-key': getApiKey(),
                 'x-username': currentUser
             },
             body: JSON.stringify({ preset, cronExpression })
@@ -959,7 +959,7 @@ async function schedulePreset() {
 async function loadSchedules() {
     try {
         const response = await fetch('/schedules', {
-            headers: { 'x-username': currentUser, 'x-api-key': 'default-api-key' }
+            headers: { 'x-username': currentUser, 'x-api-key': getApiKey() }
         });
 
         const data = await response.json();
@@ -1004,7 +1004,7 @@ async function stopSchedule(id) {
     try {
         const response = await fetch(`/schedule/${id}`, {
             method: 'DELETE',
-            headers: { 'x-username': currentUser, 'x-api-key': 'default-api-key' }
+            headers: { 'x-username': currentUser, 'x-api-key': getApiKey() }
         });
 
         if (response.ok) {
@@ -1018,6 +1018,10 @@ async function stopSchedule(id) {
 }
 
 // Funciones de visor de logs
+function getApiKey() {
+    return document.getElementById('api-key').value.trim() || 'default-api-key';
+}
+
 async function loadLogs() {
     const level = document.getElementById('log-level-filter').value;
     const startDate = document.getElementById('log-start-date').value;
@@ -1036,7 +1040,7 @@ async function loadLogs() {
         if (search) params.append('search', search);
 
         const response = await fetch(`/logs?${params}`, {
-            headers: { 'x-api-key': 'default-api-key' }
+            headers: { 'x-api-key': getApiKey() }
         });
 
         const data = await response.json();
