@@ -198,7 +198,7 @@ async function syncTable(tableName, pkColumns) {
     // Crear tabla temporal global en clone con datos de target
     // Usamos ##Temp (global) para evitar problemas de visibilidad entre requests
     // Agregamos timestamp para unicidad
-    const tempTableName = `##Temp_${tableName}_${Date.now()}`;
+    const tempTableName = `##Temp_${tableName}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
 
     // Asegurar que no exista previamente (aunque con timestamp es improbable)
     try {

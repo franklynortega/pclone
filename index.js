@@ -67,4 +67,8 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+import { fileURLToPath } from 'url';
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch(console.error);
+}

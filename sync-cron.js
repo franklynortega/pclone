@@ -58,10 +58,12 @@ async function runSync() {
   }
 }
 
-runSync().catch(error => {
-  logger.error('Error fatal en sync-cron.js:', error);
-  // Remover lock en caso de error
-  if (fs.existsSync(lockFile)) {
-    fs.unlinkSync(lockFile);
-  }
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  runSync().catch(error => {
+    logger.error('Error fatal en sync-cron.js:', error);
+    // Remover lock en caso de error
+    if (fs.existsSync(lockFile)) {
+      fs.unlinkSync(lockFile);
+    }
+  });
+}
